@@ -1,0 +1,7 @@
+name = Bapitest
+description = selwyn learning drupal batch API
+core = 7.x
+;configure = admin/config/media/colorbox
+;files[] = views/colorbox_handler_field_colorbox.inc
+version = "7.x-1.0"
+project = "Selwyn"

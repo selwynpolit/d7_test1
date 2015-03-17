@@ -1,0 +1,69 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: selwyn.polit
+ * Date: 3/10/15
+ * Time: 10:50 AM
+ */
+
+
+/**
+ * Implements hook_menu().
+ */
+function my_module_menu() {
+  $items = array();
+  $items['bapitest/batch_fix'] = array(
+    'title' => 'Batch fix',
+    'page callback' => 'bapitest_batch_fix',
+    'access arguments' => array('administer users'),
+  );
+  return $items;
+}
+
+/**
+ * The batch callback.
+ */
+function bapitest_batch_fix() {
+  $batch = array(
+    'operations' => array(),
+    'finished' => 'bapitest_batch_fix_finished',
+    'title' => t('Batch fix'),
+    'init_message' => t('Fix is starting...'),
+    'progress_message' => t('Processed @current out of @total.'),
+    'error_message' => t('Fix has encountered an error.')
+  );
+  $results = array("Hello", "World");
+  foreach ($results as $result) {
+    $batch['operations'][] = array('bapitest_batch_fix_process', array($result));
+  }
+  batch_set($batch);
+  batch_process('user'); // The path to redirect to when done.
+}
+
+/**
+ * The batch processor.
+ */
+function bapitest_batch_fix_process($word, &$context) {
+  // Do heavy lifting here...
+
+  // Display a progress message...
+  $context['message'] = "Now processing $word...";
+}
+
+/**
+ * The batch finish handler.
+ */
+function bapitest_batch_fix_finished($success, $results, $operations) {
+  if ($success) {
+    drupal_set_message('Fix is complete!');
+  }
+  else {
+    $error_operation = reset($operations);
+    $message = t('An error occurred while processing %error_operation with arguments: @arguments', array(
+      '%error_operation' => $error_operation[0],
+      '@arguments' => print_r($error_operation[1], TRUE)
+    ));
+    drupal_set_message($message, 'error');
+  }
+  drupal_set_message(l('Run again', 'bapitest/batch_fix'));
+}
