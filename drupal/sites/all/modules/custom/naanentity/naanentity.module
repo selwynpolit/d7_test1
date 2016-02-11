@@ -1,0 +1,207 @@
+<?php
+
+/**
+ * Implements hook_entity_info().
+ */
+function naanentity_entity_info() {
+  $info = array();
+  $info['naan'] = array(
+    'label' => t('Naan'),
+    'base table' => 'naanentity_naan',
+    'entity keys' => array(
+      'id' => 'id',
+      'label' => 'title',
+    ),
+    'uri callback' => 'entity_class_uri',
+    'entity class' => 'NaanEntity',
+//    'controller class' => 'EntityAPIController',
+    'controller class' => 'NaanEntityController',
+    'module' => 'naanentity',
+    'access callback' => 'naanentity_access_callback',
+
+    'admin ui' => array(
+//      'path' => 'admin/content/naans',
+      'path' => 'admin/naans',
+      'controller class' => 'NaanEntityUIController',
+      'menu wildcard' => '%naan',
+      'file' => 'naanentity.admin.inc',
+    ),
+
+    // Tell FieldAPI that fields can be attached to our naan entity
+    'fieldable' => TRUE,
+    'bundles' => array(
+      'nan' => array(
+        'label' => t('Nan'),
+        'admin' => array(
+          //          'path' => 'admin/content/nans',
+          'path' => 'admin/naans',
+          'access arguments' => array('administer naans'),
+        ),
+      ),
+    ),
+    'views controller class' => 'EntityDefaultViewsController',
+  );
+
+  return $info;
+}
+
+
+/**
+ * Implements hook_permission().
+ */
+function naanentity_permission() {
+  return array(
+    'administer naans' => array(
+      'title' => t('Administer Naan Entities'),
+    ),
+    'view naans' => array(
+      'title' => t('View Naan Entities'),
+    ),
+  );
+}
+
+/**
+ * Check access permissions for naan entities.
+ */
+function naanentity_access_callback($op, $naanentity = NULL, $account = NULL) {
+  if (($op == 'view' && user_access('view naans', $account)) || user_access('administer naans', $account)) {
+    return TRUE;
+  }
+  else if (user_access('administer naans', $account)) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function naanentity_menu() {
+  $items = array();
+  $items['naan/%naanentity'] = array(
+//  $items['naan/%'] = array(
+    'title' => 'Naan',
+    'page callback' => 'naanentity_view_entity',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+  );
+
+  $items['naanentity'] = array(
+    'title' => 'Naan Demo page',
+    'page callback' => 'naanentity_demo_page',
+    'access callback' => TRUE,  //fake perms
+    'menu' => 'navigation',
+  );
+
+  return $items;
+}
+/**
+ * Menu autoloader for /naan.
+ */
+function naanentity_load($id) {
+  $naan = entity_load('naan', array($id));
+  return array_pop($naan);
+}
+/**
+ * Callback for /naan/ID page.
+ *
+ * Just a place to render a complete naan entity.
+ */
+function naanentity_view_entity($naan) {
+//function naanentity_view_entity($id) {
+//  if ($id <= 0) {
+//    return "id not found" ;
+//  }
+//  $naan = entity_load("naan", array($id));
+//  $naan = reset($naan);
+  drupal_set_title($naan->title);
+  $naan_entity = entity_view('naan', array($naan->id => $naan));
+  kpr($naan_entity);
+  return $naan_entity;
+}
+
+/**
+ * Callback for /naanentity page.
+ *
+ * Just a place to test things out and be able to see the results on a page.
+ */
+function naanentity_demo_page() {
+  $naan = entity_load('naan', array(1));
+  kpr($naan);
+
+  // Or load it with EFQ.
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'naan');
+  $results = $query->execute();
+  kpr($results);
+  return 'hello there!';
+}
+
+
+/**
+ * Our custom entity class.
+ *
+ * The Entity class we're overriding is in
+ * sites/all/modules/contrib/entity/includes/entity.inc
+ */
+class NaanEntity extends Entity {
+  /**
+   * Override this in order to implement a custom default URI.
+   */
+  protected function defaultUri() {
+    return array('path' => 'naan/' . $this->identifier());
+  }
+}
+/**
+ * Our custom controller for the admin ui.
+ *
+ * The EntityDefaultUIController can be found in
+ * sites/all/modules/contrib/entity/includes/entity.ui.inc
+ */
+class NaanEntityUIController extends EntityDefaultUIController {
+
+}
+
+/**
+ * Our custom controller for the videoentity type.
+ *
+ * We're choosing to extend the controller provided by the entity module for
+ * full CRUD support for videoentities.
+ *
+ * The EntityAPIController is found in
+ * sites/all/modules/contrib/entity/includes/entity.controller.inc
+ */
+class NaanEntityController extends EntityAPIController {
+
+  public function buildContent($entity, $view_mode = 'full', $langcode = NULL, $content = array()) {
+    $build = parent::buildContent($entity, $view_mode, $langcode, $content);
+
+//    $build['duration'] = array(
+//      '#type' => 'markup',
+//      '#markup' => format_interval($entity->duration),
+//    );
+//
+//    $build['embedcode'] = array(
+//      '#type' => 'markup',
+//      '#markup' => '<iframe width="560" height="315" src="http://www.youtube.com/embed/'. $entity->embedcode . '" frameborder="0" allowfullscreen></iframe>',
+//    );
+
+    return $build;
+  }
+
+  /**
+   * Override save method.
+   *
+   * Populate created and updated dates automatically.
+   */
+  public function save($entity, DatabaseTransaction $transaction = NULL) {
+
+    if (isset($entity->is_new)) {
+      $entity->created_at = REQUEST_TIME;
+    }
+
+    $entity->updated_at = REQUEST_TIME;
+
+    return parent::save($entity, $transaction);
+  }
+}

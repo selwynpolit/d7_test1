@@ -1,0 +1,9 @@
+name = Not-a-a-Node
+description = Grock entities
+core = 7.x
+;package = Selwyn
+version = "7.x-1.0"
+project = "Selwyn"
+dependencies[] = entity
+
+
