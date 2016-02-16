@@ -10,7 +10,7 @@ function naanentity_entity_info() {
     'base table' => 'naanentity_naan',
     'entity keys' => array(
       'id' => 'id',
-      'label' => 'title',
+      'label' => 'name',
     ),
     'uri callback' => 'entity_class_uri',
     'entity class' => 'NaanEntity',
@@ -23,7 +23,7 @@ function naanentity_entity_info() {
 //      'path' => 'admin/content/naans',
       'path' => 'admin/naans',
       'controller class' => 'NaanEntityUIController',
-      'menu wildcard' => '%naan',
+      'menu wildcard' => '%naanentity',
       'file' => 'naanentity.admin.inc',
     ),
 
@@ -31,9 +31,9 @@ function naanentity_entity_info() {
     'fieldable' => TRUE,
     'bundles' => array(
       'nan' => array(
-        'label' => t('Nan'),
+        'label' => t('Naan'),
         'admin' => array(
-          //          'path' => 'admin/content/nans',
+//                    'path' => 'admin/content/nans',
           'path' => 'admin/naans',
           'access arguments' => array('administer naans'),
         ),

@@ -5,5 +5,6 @@ core = 7.x
 version = "7.x-1.0"
 project = "Selwyn"
 dependencies[] = entity
+;https://github.com/selwynpolit/d7_test1/tree/master/drupal/sites/all/modules/custom/naanentity
 
 
