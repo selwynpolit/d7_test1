@@ -38,7 +38,18 @@ function naanentity_schema() {
         'length' => 255,
         'not null' => TRUE,
       ),
-
+      'created_at' => array(
+        'description' => 'Date and time the video record was processed.',
+        'type' => 'int',
+        'length' => 10,
+        'not null' => FALSE,
+      ),
+      'updated_at' => array(
+        'description' => 'Date and time the video record was last modified.',
+        'type' => 'int',
+        'length' => 10,
+        'not null' => FALSE,
+      ),
       'frequency' => array(
         'description' => t('The time between indexing in seconds.'),
         'type' => 'int',

@@ -33,7 +33,8 @@ function naan_form($form, &$form_state, $naan = NULL) {
   );
   $form['auto_populate_body'] = array(
     '#title' => t('Auto Populate Body (Y/N)'),
-    '#type' => 'textfield',
+    '#type' => 'radios',
+    '#options' => array(1 => t('Yes'), 0 => t('No')),
     '#default_value' => isset($naan->auto_populate_body) ? $naan->auto_populate_body : 'N',
     '#description' => t('Automatically load the contents of the path into the body field for indexing.'),
     '#required' => TRUE,
@@ -48,13 +49,14 @@ function naan_form($form, &$form_state, $naan = NULL) {
     '#required' => FALSE,
   );
 
+  // Adds the fieldable fields to the form.
   field_attach_form('naan', $naan, $form, $form_state);
 
   $form['actions'] = array(
     '#type' => 'actions',
     'submit' => array(
       '#type' => 'submit',
-      '#value' => isset($naan->id) ? t('Update Nan') : t('Save Nan'),
+      '#value' => isset($naan->id) ? t('Update Naan') : t('Save Naan'),
     ),
   );
 
@@ -65,9 +67,21 @@ function naan_form($form, &$form_state, $naan = NULL) {
  * Validation for naan entity form.
  */
 function naan_form_validate($form, &$form_state) {
-  if (isset($form_state['values']['duration']) && !is_numeric($form_state['values']['duration'])) {
-    form_set_error('duration', t('Duration field must be an integer value.'));
+  if (isset($form_state['values']['frequency']) && !is_numeric($form_state['values']['frequency'])) {
+    form_set_error('frequency', t('Frequency field must be an integer value.'));
   }
+
+  if (isset($form_state['values']['urlpath'])) {
+    $val = trim($form_state['values']['urlpath']);
+    if (substr($val, 0, 1) === '/') {
+      form_set_error('urlpath', t('URL may not begin with a forward slash /.'));
+    }
+    if (substr($val, 0, 1) === "\\") {
+      form_set_error('urlpath', t('URL may not begin with a backslash \.'));
+    }
+  }
+
+
 }
 
 /**

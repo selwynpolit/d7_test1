@@ -30,10 +30,10 @@ function naanentity_entity_info() {
     // Tell FieldAPI that fields can be attached to our naan entity
     'fieldable' => TRUE,
     'bundles' => array(
-      'nan' => array(
+      'naan' => array(
         'label' => t('Naan'),
         'admin' => array(
-//                    'path' => 'admin/content/nans',
+//                    'path' => 'admin/content/naans',
           'path' => 'admin/naans',
           'access arguments' => array('administer naans'),
         ),
@@ -114,7 +114,7 @@ function naanentity_view_entity($naan) {
 //  }
 //  $naan = entity_load("naan", array($id));
 //  $naan = reset($naan);
-  drupal_set_title($naan->title);
+  drupal_set_title($naan->name);
   $naan_entity = entity_view('naan', array($naan->id => $naan));
   kpr($naan_entity);
   return $naan_entity;
@@ -176,15 +176,44 @@ class NaanEntityController extends EntityAPIController {
   public function buildContent($entity, $view_mode = 'full', $langcode = NULL, $content = array()) {
     $build = parent::buildContent($entity, $view_mode, $langcode, $content);
 
-//    $build['duration'] = array(
-//      '#type' => 'markup',
-//      '#markup' => format_interval($entity->duration),
-//    );
-//
-//    $build['embedcode'] = array(
-//      '#type' => 'markup',
-//      '#markup' => '<iframe width="560" height="315" src="http://www.youtube.com/embed/'. $entity->embedcode . '" frameborder="0" allowfullscreen></iframe>',
-//    );
+    $build['description'] = array(
+      '#type' => 'markup',
+      '#prefix' => '<div>',
+      '#suffix' => '</div>',
+      '#markup' => 'Description: ' . $entity->description,
+    );
+
+    $build['urlpath'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div>' . 'URLPath: ' .$entity->urlpath .'</div>',
+    );
+    $build['frequency'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div>' . 'Frequency: ' .$entity->frequency .'</div>',
+    );
+    $build['auto_populate_body'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div>' . 'Auto Populate Body: ' .$entity->auto_populate_body .'</div>',
+    );
+    $build['body'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div>' . 'Body: ' .$entity->body .'</div>',
+    );
+    $updated_at = date(DATE_RSS, $entity->updated_at) ;
+    $created_at = date(DATE_RSS, $entity->created_at) ;
+
+    $build['created_at'] = array(
+      '#type' => 'markup',
+      '#prefix' => '<div>',
+      '#suffix' => '</div>',
+      '#markup' => 'Created At: ' . $created_at,
+    );
+    $build['updated_at'] = array(
+      '#type' => 'markup',
+      '#prefix' => '<div>',
+      '#suffix' => '</div>',
+      '#markup' => 'Updated At: ' . $updated_at,
+    );
 
     return $build;
   }
@@ -199,7 +228,6 @@ class NaanEntityController extends EntityAPIController {
     if (isset($entity->is_new)) {
       $entity->created_at = REQUEST_TIME;
     }
-
     $entity->updated_at = REQUEST_TIME;
 
     return parent::save($entity, $transaction);
