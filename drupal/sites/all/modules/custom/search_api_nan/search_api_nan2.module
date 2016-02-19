@@ -1,0 +1,606 @@
+<?php
+/**
+ * @file
+ * Provides hook and common functions for non-node searching.
+ */
+//TODO: admin config page link from module page
+
+/**
+ * Implements hook_entity_info().
+ */
+function search_api_nan_entity_info() {
+  $info = array();
+
+  $info['search_api_nan'] = array(
+    'label' => t('Search API NAN'),
+    'base table' => 'search_api_nan',
+    'entity keys' => array(
+      'id' => 'nan_id',
+      'label' => 'url_path',
+    ),
+    'entity class' => 'Entity',
+    'controller class' => 'EntityAPIController',
+
+  );
+
+  return $info;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function search_api_nan_menu() {
+  $items = array();
+  $items['nan/%'] = array(
+    'title' => 'Search API Nan',
+    'page callback' => 'nan_view_entity',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+  );
+  $items['admin/config/search/search-api-nan'] = array(
+    'title' => t('Search API Not-a-Node'),
+    'description' => t('Configure non-node index settings'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('search_api_nan_nan_settings_form'),
+    'access arguments' => array('administer search'),
+    'file' => 'search_api_nan.admin.inc',
+  );
+  return $items;
+}
+/**
+ * Menu autoloader for /nan.
+ */
+//function search_api_nan_load($id) {
+//  $nan = entity_load('nan', array($id));
+//  return array_pop($nan);
+//}
+
+/**
+ * Callback for /naan/ID page.
+ *
+ * Just a place to render a complete naan entity.
+ */
+//function nan_view_entity($naan) {
+function nan_view_entity($id) {
+  $nan = entity_load("nan", array($nan->id => $nan));
+  $nan = reset($nan);
+
+  drupal_set_title($nan->title);
+  $nan_entity = entity_view('nan', array($nan->id => $nan));
+  kpr($nan_entity);
+  return $nan_entity;
+}
+
+
+
+/**
+ * Implements hook_permission().
+ */
+/**
+ * Implements hook_permission().
+ */
+function search_api_nan_permission() {
+  $permissions = array(
+    'administer search api nans' => array(
+      'title' => t('Administer Search API Nans'),
+      'description' => t('View, Create, Edit and delete Nans.'),
+    ),
+    'add search api nans' => array(
+      'title' => t('Add Search API Nans'),
+      'description' => t('Add Nans - no edit or delete.'),
+    ),
+    'view search api nans' => array(
+      'title' => t('View Search API Nans'),
+      'description' => t('View Nans.'),
+    ),
+  );
+  return $permissions;
+}
+
+
+/**
+ * Determines whether the given user has access to a nan.
+ *
+ * @param $op
+ *   The operation being performed. One of 'view', 'update', 'create', 'delete'
+ *   or just 'edit' (being the same as 'create' or 'update').
+ * @param $nan
+ *   Optionally a nan to check access for. If nothing is
+ *   given, access for all nans is determined.
+ * @param $account
+ *   The user to check for. Leave it to NULL to check for the global user.
+ * @return boolean
+ *   Whether access is allowed or not.
+ */
+function search_api_nan_access($op, $nan = NULL, $account = NULL) {
+  if (user_access('administer search api nans', $account)) {
+    return TRUE;
+  }
+  else if ($op == 'view' && user_access('view search api nans', $account)) {
+    return TRUE;
+  }
+  else if ($op == 'create' && user_access('add search api nans', $account)) {
+    //TODO: finish/test add only permission
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_menu_local_tasks_alter().
+ */
+function search_api_nan_menu_local_tasks_alter(&$data, $router_item, $root_path) {
+  // Add action link 'admin/structure/nan/add' on 'admin/structure/nans'.
+  if ($root_path == 'admin/content/nans') {
+    $item = menu_get_item('admin/content/nans/add');
+    if ($item['access']) {
+      $data['actions']['output'][] = array(
+        '#theme' => 'menu_local_action',
+        '#link' => $item,
+      );
+    }
+  }
+}
+
+
+/**
+ * Implements hook_theme_registry_alter().
+ *
+ * Approach borrowed from https://www.drupal.org/node/715160.
+ * The idea is to use our entity theme template in the module directory first,
+ * and if someone wants to override with a theme dir template, they can.
+ */
+function search_api_nan_theme_registry_alter(&$theme_registry) {
+
+  // Defined path to the current module.
+  $module_path = drupal_get_path('module', 'search_api_nan') . '/theme';
+  // Find all .tpl.php files in this module's folder recursively.
+  $template_file_objects = drupal_find_theme_templates($theme_registry, '.tpl.php', $module_path);
+  // Iterate through all found template file objects.
+  foreach ($template_file_objects as $key => $template_file_object) {
+    // If the template has not already been overridden by a theme.
+    if (!isset($theme_registry[$key]['theme path']) || !preg_match('#/themes/#', $theme_registry[$key]['theme path'])) {
+      // Alter the theme path and template elements.
+      $theme_registry[$key]['theme path'] = $module_path;
+      $theme_registry[$key] = array_merge($theme_registry[$key], $template_file_object);
+      $theme_registry[$key]['type'] = 'module';
+    }
+  }
+}
+/**
+ *
+ * Implements hook_cron().
+ *
+ * Find non-nodes that should be indexed and pass them to solr.
+ */
+function search_api_nan_cron() {
+  // Get all NANs in the DB
+  $nans = entity_load('apachesolr_nan', FALSE);
+
+  foreach ($nans as $nan) {
+
+    // Reindex the NAN if it hasn't been updated within the frequency window.
+    if ( (time() - $nan->last_indexed) > $nan->frequency ) {
+
+      search_api_nan_process_solr_indexes($nan);
+      watchdog('Search API NAN search', 'The Search API non-node item %id from path %path was indexed.', array('%id' => $nan->id, '%path' => $nan->path));
+      $nan->last_indexed = REQUEST_TIME;
+      $nan->save();
+    }
+  }
+}
+
+/**
+ * // TODO: implement this function - maybe?
+ * Send information to solr for indexing.
+ *
+ * @param string $path
+ *   A string representing the path to index.
+ * @param string $title
+ *   A string representing the title as it should appear in the search index.
+ * @param string $description
+ *   A string representing additional search terms or a description that will be
+ *   helpful for users to find the page.
+ * @param int $fnid
+ *   An integer that will be used to designate the node id of the non-node. The
+ *   "f" stands for fake. This should be a negative number to keep it out of the
+ *   normal node id space. If a positive integer is received it will be
+ *   multiplied by negative one.
+ */
+function search_api_nan_process_solr_indexes($path, $title, $description, $fnid) {
+  if ($fnid > 0 && is_numeric($fnid)) {
+    $fnid = (int) $fnid * -1;
+  }
+  global $user;
+  drupal_save_session(FALSE);
+  $saved_user = $user;
+  // build the content for the index as an anonymous user to avoid exposing
+  // restricted fields and such. By setting a variable, indexing can take place
+  // as a different user
+  $uid = variable_get('apachesolr_index_user', 0);
+  if ($uid == 0) {
+    $user = drupal_anonymous_user();
+  }
+  else {
+    $user = user_load($uid);
+  }
+
+  return ;
+
+  module_load_include('inc', 'apachesolr', 'apachesolr.index');
+  global $base_url;
+  global $language;
+  $env_id = variable_get('apachesolr_nan_nan_env', apachesolr_default_environment());
+  $entity_type = 'apachesolr_nan';
+  $item = menu_get_item($nan->path);
+  if (empty($item['access'])) {
+    apachesolr_index_delete_entity_from_index($env_id, 'nan', $nan->id);
+    watchdog('ApacheSolr NAN search', 'Access to %id from path %path is not allowed to be viewed by the indexing user and has been removed..', array('%id' => $fnid, '%path' => $path));
+    return FALSE;
+  }
+  $function = $item['page_callback'];
+  if (!empty($item['include_file'])) {
+    require_once($item['include_file']);
+  }
+  $content = call_user_func_array($function, $item['page_arguments']);
+  if (is_array($content)) {
+    $content = $content['content'];
+  }
+
+  // Create the Solr document and send it to the index.
+  $document = new ApacheSolrDocument();
+  $document->id = apachesolr_document_id($nan->id, $entity_type);
+  $document->is_uid = $user->uid;
+  $document->site = $base_url;
+  $document->hash = apachesolr_site_hash();
+  $document->entity_id = $nan->id;
+  $document->entity_type = $entity_type;
+  $document->ss_language = $language->language;
+  $document->path = $nan->path;
+  $document->url = url($nan->path, array('absolute' => TRUE));
+  $document->path_alias = $nan->path;
+  $document->label = $nan->title;
+  $document->content = apachesolr_clean_text($content);
+  $document->teaser = truncate_utf8($document->content, 300, TRUE);
+  $document->sm_title_field = array( $nan->title );
+  $documents[] = $document;
+  apachesolr_index_send_to_solr($env_id, $documents);
+  // Restore the user.
+  $user = $saved_user;
+  drupal_save_session(TRUE);
+}
+
+
+
+
+
+/**
+ *
+ *
+ * Modify the link on the search page results so the user sees the actual
+ * nan item (i.e. views page or other page) not our special entity.
+ *
+ * @param Array $vars
+ *   An array of search results.
+ *
+ */
+function search_api_nan_preprocess_search_api_page_result(&$vars) {
+// Change link to the page, on search result page.
+// Because the url points to the entity and needs to be the proper page.
+  if ($vars['item']->type === 'searchable_stubs') {
+    $vars['url']['path'] = $vars['item']->field_searchstub_path['und'][0]['safe_value'];
+  }
+}
+
+/**
+ * Fetch a nan object. Make sure that the wildcard you choose
+ * in the nan entity definition fits the function name here.
+ *
+ * @param $nan_id
+ *   Integer specifying the nan id.
+ * @param $reset
+ *   A boolean indicating that the internal cache should be reset.
+ * @return
+ *   A fully-loaded $nan object or FALSE if it cannot be loaded.
+ *
+ * @see nan_load_multiple()
+ */
+function search_api_nan_load($nan_id, $reset = FALSE) {
+  $nans = search_api_nan_load_multiple(array($nan_id), array(), $reset);
+  return reset($nans);
+}
+
+
+/**
+ * Load multiple nans based on certain conditions.
+ *
+ * @param $nan_ids
+ *   An array of nan IDs.
+ * @param $conditions
+ *   An array of conditions to match against the {search_api_nan} table.
+ * @param $reset
+ *   A boolean indicating that the internal cache should be reset.
+ * @return
+ *   An array of nan objects, indexed by nan_id.
+ *
+ * @see entity_load()
+ * @see nan_load()
+ */
+function search_api_nan_load_multiple($nan_ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('nan', $nan_ids, $conditions, $reset);
+}
+
+
+/**
+ * Deletes a nan.
+ */
+function search_api_nan_delete(Nan $nan) {
+  $nan->delete();
+}
+
+
+/**
+ * Delete multiple nans.
+ *
+ * @param $nan_ids
+ *   An array of nan IDs.
+ */
+function search_api_nan_delete_multiple(array $nan_ids) {
+  entity_get_controller('nan')->delete($nan_ids);
+}
+
+
+/**
+ * Create a nan object.
+ */
+function search_api_nan_create($values = array()) {
+  return entity_get_controller('nan')->create($values);
+}
+
+/**
+ * Saves a nan to the database.
+ *
+ * @param $nan
+ *   The nan object.
+ */
+function search_api_nan_save(Nan $nan) {
+  return $nan->save();
+}
+
+
+/**
+ * URI callback for nans
+ */
+function search_api_nan_uri(Nan $nan){
+  return array(
+    'path' => 'nan/' . $nan->nan_id,
+  );
+}
+
+
+/**
+ * Menu title callback for showing individual entities
+ */
+function search_api_nan_page_title(Nan $nan){
+  return $nan->name;
+}
+
+/**
+ * Sets up content to show an individual nan
+ * @todo - get rid of drupal_set_title();
+ */
+function search_api_nan_page_view($nan, $view_mode = 'full') {
+  $controller = entity_get_controller('nan');
+  $content = $controller->view(array($nan->nan_id => $nan));
+  drupal_set_title($nan->name);
+  return $content;
+}
+
+
+/**
+ * Implements hook_views_api().
+ */
+function search_api_nan_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'search_api_nan') . '/views',
+  );
+}
+
+
+/**
+ * Implement hook_theme().
+ */
+function nan_theme() {
+  return array(
+    'nan_add_list' => array(
+      'variables' => array('content' => array()),
+      'file' => 'search_api_nan.admin.inc',
+    ),
+    'nan' => array(
+      'render element' => 'elements',
+      'template' => 'nan',
+    ),
+    'nan_sample_data' => array(
+      'variables' => array('nan_sample_data', 'nan' => NULL),
+      'template' => 'nan-sample-data',
+    ),
+
+
+  );
+}
+
+
+
+
+
+/**
+ * The Controller for Nan entities
+ */
+class NanController extends EntityAPIController {
+  public function __construct($entityType) {
+    parent::__construct($entityType);
+  }
+  /**
+   * Create a nan - we first set up the values that are specific
+   * to our nan schema but then also go through the EntityAPIController
+   * function.
+   *
+   * @param $type
+   *   The machine-readable type of the nan.
+   *
+   * @return
+   *   A nan object with all default fields initialized.
+   */
+  public function create(array $values = array()) {
+    // Add values that are specific to our Nan
+    $values += array(
+      'nan_id' => '',
+      'path' => '',
+      'description' => '',
+      'title' => '',
+      'frequency' => 0,
+      'last_indexed' => 0,
+      'auto_populate_content' => FALSE,
+      'body' => '',
+    );
+
+    $nan = parent::create($values);
+    return $nan;
+  }
+}
+
+/**
+ * UI controller.
+ */
+class SearchAPINanUIController extends EntityDefaultUIController {
+
+  /**
+   * Overrides hook_menu() defaults. Main reason for doing this is that
+   * parent class hook_menu() is optimized for entity type administration.
+   */
+  public function hook_menu() {
+
+    $items = array();
+    $id_count = count(explode('/', $this->path));
+    $wildcard = isset($this->entityInfo['admin ui']['menu wildcard']) ? $this->entityInfo['admin ui']['menu wildcard'] : '%' . $this->entityType;
+
+    $items[$this->path] = array(
+      'title' => 'Nans',
+      'description' => 'Add edit and update nans.',
+      'page callback' => 'system_admin_menu_block_page',
+      'access arguments' => array('access administration pages'),
+      'file path' => drupal_get_path('module', 'system'),
+      'file' => 'system.admin.inc',
+    );
+
+    // Change the overview menu type for the list of nans.
+    $items[$this->path]['type'] = MENU_LOCAL_TASK;
+
+    // Change the add page menu to multiple types of entities
+//    $items[$this->path . '/add'] = array(
+//      'title' => 'Add a nan',
+//      'description' => 'Add a new nan',
+//      'page callback'  => 'nan_add_page',
+//      'access callback'  => 'search_api_search_api_nan_access',
+//      'access arguments' => array('edit'),
+//      'type' => MENU_NORMAL_ITEM,
+//      'weight' => 20,
+//      'file' => 'search_api_nan.admin.inc',
+//      'file path' => drupal_get_path('module', $this->entityInfo['module'])
+//
+//    );
+//
+//    // Add menu items to add each different type of entity.
+//    foreach (nan_get_types() as $type) {
+//      $items[$this->path . '/add/' . $type->type] = array(
+//        'title' => 'Add ' . $type->label,
+//        'page callback' => 'nan_form_wrapper',
+//        'page arguments' => array(nan_create(array('type' => $type->type))),
+//        'access callback' => 'search_api_nan_access',
+//        'access arguments' => array('edit', 'edit ' . $type->type),
+//        'file' => 'search_api_nan.admin.inc',
+//        'file path' => drupal_get_path('module', $this->entityInfo['module'])
+//      );
+
+    // Change the add page menu to multiple types of entities
+    //todo: change it back to only 1 type of entity
+    $items[$this->path . '/add'] = array(
+      'title' => 'Add a nan',
+      'description' => 'Add a new nan',
+      'page callback'  => 'nan_add_page',
+      'access callback'  => 'search_api_nan_access',
+      'access arguments' => array('edit'),
+      'type' => MENU_NORMAL_ITEM,
+      'weight' => 20,
+      'file' => 'search_api_nan.admin.inc',
+      'file path' => drupal_get_path('module', $this->entityInfo['module'])
+
+    );
+
+
+    // Loading and editing nan entities
+    $items[$this->path . '/nan/' . $wildcard] = array(
+      'page callback' => 'nan_form_wrapper',
+      'page arguments' => array($id_count + 1),
+      'access callback' => 'search_api_nan_access',
+      'access arguments' => array('edit', $id_count + 1),
+      'weight' => 0,
+      'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+      'file' => 'search_api_nan.admin.inc',
+      'file path' => drupal_get_path('module', $this->entityInfo['module'])
+    );
+    $items[$this->path . '/nan/' . $wildcard . '/edit'] = array(
+      'title' => 'Edit',
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'weight' => -10,
+      'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+    );
+
+    $items[$this->path . '/nan/' . $wildcard . '/delete'] = array(
+      'title' => 'Delete',
+      'page callback' => 'nan_delete_form_wrapper',
+      'page arguments' => array($id_count + 1),
+      'access callback' => 'search_api_nan_access',
+      'access arguments' => array('edit', $id_count + 1),
+      'type' => MENU_LOCAL_TASK,
+      'context' => MENU_CONTEXT_INLINE,
+      'weight' => 10,
+      'file' => 'search_api_nan.admin.inc',
+      'file path' => drupal_get_path('module', $this->entityInfo['module'])
+    );
+
+    // Menu item for viewing nans
+    $items['nan/' . $wildcard] = array(
+      //'title' => 'Title',
+      'title callback' => 'nan_page_title',
+      'title arguments' => array(1),
+      'page callback' => 'nan_page_view',
+      'page arguments' => array(1),
+      'access callback' => 'search_api_nan_access',
+      'access arguments' => array('view', 1),
+      'type' => MENU_CALLBACK,
+    );
+    return $items;
+  }
+
+
+  /**
+   * Create the markup for the add Nan Entities page within the class
+   * so it can easily be extended/overriden.
+   */
+  public function addPage() {
+    $item = menu_get_item();
+    $content = system_admin_menu_block($item);
+
+    if (count($content) == 1) {
+      $item = array_shift($content);
+      drupal_goto($item['href']);
+    }
+
+    return theme('nan_add_list', array('content' => $content));
+  }
+
+}
+
+

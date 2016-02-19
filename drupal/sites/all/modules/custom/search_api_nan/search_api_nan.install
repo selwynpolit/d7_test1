@@ -1,0 +1,74 @@
+<?php
+
+/**
+ * @file
+ * Defines tables for not-a-node(nan) search data and cleanup functions.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function search_api_nan_schema() {
+  $schema['search_api_nan'] = array(
+    'description' => t('The base table for the NAN entity'),
+    'fields' => array(
+      'nan_id' => array(
+        'description' => t('Primary key of the NAN entity'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'title' => array(
+        'description' => t('The title that will be added to the index.'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+      ),
+      'description' => array(
+        'description' => t('The description to show users for search results.'),
+        'type' => 'text',
+        'not null' => FALSE,
+      ),
+      'urlpath' => array(
+        'description' => t('The path to index.'),
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+
+      'frequency' => array(
+        'description' => t('The time between indexing in seconds.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'last_indexed' => array(
+        'description' => t('The unix timestamp of the last index run.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'auto_populate_body' => array(
+        'description' => t('Automatically generate the body so it can be included in the index.'),
+        'type' => 'int',
+        'default' => 1,
+        'not null' => TRUE,
+      ),
+      'body' => array(
+        'description' => t('Optional body text to index.'),
+        'type' => 'blob',
+        'size' => 'big',
+        'serialize' => FALSE,
+        'not null' => FALSE,
+      ),
+
+    ),
+    'primary key' => array('nan_id'),
+    'unique keys' => array(
+      'urlpath' => array('urlpath'),
+    ),
+  );
+
+  return $schema;
+}

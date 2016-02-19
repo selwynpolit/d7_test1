@@ -1,0 +1,165 @@
+<?php
+/**
+ * @file
+ * Provides hook and common functions for non-node searching.
+ */
+//TODO: admin config page link from module page
+
+/**
+ * Implements hook_entity_info().
+ */
+function search_api_nan_entity_info() {
+  $info = array();
+
+  $info['search_api_nan'] = array(
+    'label' => t('Search API NAN'),
+    'base table' => 'search_api_nan',
+    'entity keys' => array(
+      'id' => 'nan_id',
+      'label' => 'url_path',
+    ),
+    'entity class' => 'Entity',
+    'controller class' => 'EntityAPIController',
+
+  );
+
+  return $info;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function search_api_nan_menu() {
+  $items = array();
+  $items['admin/config/search/search-api-nan'] = array(
+    'title' => t('Search API Not-a-Node'),
+    'description' => t('Configure non-node index settings'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('search_api_nan_nan_settings_form'),
+    'access arguments' => array('administer search'),
+    'file' => 'search_api_nan.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_theme_registry_alter().
+ *
+ * Approach borrowed from https://www.drupal.org/node/715160.
+ * The idea is to use our entity theme template in the module directory first,
+ * and if someone wants to override with a theme dir template, they can.
+ */
+function search_api_nan_theme_registry_alter(&$theme_registry) {
+
+  // Defined path to the current module.
+  $module_path = drupal_get_path('module', 'search_api_nan') . '/theme';
+  // Find all .tpl.php files in this module's folder recursively.
+  $template_file_objects = drupal_find_theme_templates($theme_registry, '.tpl.php', $module_path);
+  // Iterate through all found template file objects.
+  foreach ($template_file_objects as $key => $template_file_object) {
+    // If the template has not already been overridden by a theme.
+    if (!isset($theme_registry[$key]['theme path']) || !preg_match('#/themes/#', $theme_registry[$key]['theme path'])) {
+      // Alter the theme path and template elements.
+      $theme_registry[$key]['theme path'] = $module_path;
+      $theme_registry[$key] = array_merge($theme_registry[$key], $template_file_object);
+      $theme_registry[$key]['type'] = 'module';
+    }
+  }
+}
+
+/**
+ * Implements hook_cron().
+ *
+ * Find non-nodes that should be indexed and pass them to solr.
+ */
+function search_api_nan_cron() {
+
+  // Get all NANs in the DB
+  $nans = entity_load('apachesolr_nan', FALSE);
+
+  foreach ($nans as $nan) {
+
+    // Todo: implement?
+
+//    // Reindex the NAN if it hasn't been updated within the frequency window.
+//    if ( (time() - $nan->last_indexed) > $nan->frequency ) {
+//
+//      apachesolr_nan_process_solr_indexes($nan);
+//      watchdog('ApacheSolr NAN search', 'The apache solr non-node item %id from path %path was indexed.', array('%id' => $nan->id, '%path' => $nan->path));
+//      $nan->last_indexed = REQUEST_TIME;
+//      $nan->save();
+//    }
+  }
+}
+
+
+/**
+ *
+ * Send information to solr for indexing.
+ *
+ * @param Object $nan
+ *   An object representing the apachesolr_nan entity (thing to be indexed).
+ */
+function search_api_nan_process_solr_indexes($nan) {
+
+  // build the content for the index as an anonymous user to avoid exposing
+  // restricted fields and such. By setting a variable, indexing can take place
+  // as a different user
+
+  //Todo: implement?
+
+
+//  global $user;
+//  drupal_save_session(FALSE);
+//  $saved_user = $user;
+//
+//  $uid = variable_get('apachesolr_index_user', 0);
+//  if ($uid == 0) {
+//    $user = drupal_anonymous_user();
+//  }
+//  else {
+//    $user = user_load($uid);
+//  }
+//
+//  module_load_include('inc', 'apachesolr', 'apachesolr.index');
+//  global $base_url;
+//  global $language;
+//  $env_id = variable_get('apachesolr_nan_nan_env', apachesolr_default_environment());
+//  $entity_type = 'apachesolr_nan';
+//  $item = menu_get_item($nan->path);
+//  if (empty($item['access'])) {
+//    apachesolr_index_delete_entity_from_index($env_id, 'nan', $nan->id);
+//    watchdog('ApacheSolr NAN search', 'Access to %id from path %path is not allowed to be viewed by the indexing user and has been removed..', array('%id' => $fnid, '%path' => $path));
+//    return FALSE;
+//  }
+//  $function = $item['page_callback'];
+//  if (!empty($item['include_file'])) {
+//    require_once($item['include_file']);
+//  }
+//  $content = call_user_func_array($function, $item['page_arguments']);
+//  if (is_array($content)) {
+//    $content = $content['content'];
+//  }
+//
+//  // Create the Solr document and send it to the index.
+//  $document = new ApacheSolrDocument();
+//  $document->id = apachesolr_document_id($nan->id, $entity_type);
+//  $document->is_uid = $user->uid;
+//  $document->site = $base_url;
+//  $document->hash = apachesolr_site_hash();
+//  $document->entity_id = $nan->id;
+//  $document->entity_type = $entity_type;
+//  $document->ss_language = $language->language;
+//  $document->path = $nan->path;
+//  $document->url = url($nan->path, array('absolute' => TRUE));
+//  $document->path_alias = $nan->path;
+//  $document->label = $nan->title;
+//  $document->content = apachesolr_clean_text($content);
+//  $document->teaser = truncate_utf8($document->content, 300, TRUE);
+//  $document->sm_title_field = array( $nan->title );
+//  $documents[] = $document;
+//  apachesolr_index_send_to_solr($env_id, $documents);
+//  // Restore the user.
+//  $user = $saved_user;
+//  drupal_save_session(TRUE);
+}
