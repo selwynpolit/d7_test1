@@ -10,17 +10,26 @@
  */
 function search_api_nan_entity_info() {
   $info = array();
-
   $info['search_api_nan'] = array(
     'label' => t('Search API NAN'),
     'base table' => 'search_api_nan',
     'entity keys' => array(
       'id' => 'nan_id',
-      'label' => 'url_path',
+      'label' => 'title',
     ),
-    'entity class' => 'Entity',
-    'controller class' => 'EntityAPIController',
+    'uri callback' => 'entity_class_uri',
+    'entity class' => 'NanEntity',
+    'controller class' => 'NanEntityAPIController',
+    'module' => 'search_api_nan',
+    'access callback' => 'search_api_nan_access_callback',
 
+    'admin ui' => array(
+      'path' => 'admin/config/search/search-api-nans',
+      'controller class' => 'NanEntityUIController',
+      'menu wildcard' => '%nanentity',
+      'file' => 'search_api_nan.admin.inc',
+    ),
+//    'views controller class' => 'EntityDefaultViewsController',
   );
 
   return $info;
@@ -31,13 +40,24 @@ function search_api_nan_entity_info() {
  */
 function search_api_nan_menu() {
   $items = array();
+
   $items['admin/config/search/search-api-nan'] = array(
     'title' => t('Search API Not-a-Node'),
     'description' => t('Configure non-node index settings'),
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('search_api_nan_nan_settings_form'),
+//    'page callback' => 'drupal_get_form',
+//    'page arguments' => array('search_api_nan_nan_settings_form'),
+    'page callback' => 'search_api_nan_view_entity',
+    'page arguments' => array(5),
     'access arguments' => array('administer search'),
     'file' => 'search_api_nan.admin.inc',
+  );
+  $items = array();
+  $items['admin/config/search/search-api-nan/nan/%nanentity'] = array(
+//  $items['admin/config/search/search-api-nan/nan/%'] = array(
+    'title' => 'Naan',
+    'page callback' => 'nan_view_entity',
+    'page arguments' => array(5),
+    'access callback' => TRUE,
   );
   return $items;
 }
@@ -162,4 +182,332 @@ function search_api_nan_process_solr_indexes($nan) {
 //  // Restore the user.
 //  $user = $saved_user;
 //  drupal_save_session(TRUE);
+}
+
+/**
+ * Implements hook_permission().
+ */
+/**
+ * Implements hook_permission().
+ */
+function search_api_nan_permission() {
+  $permissions = array(
+    'administer search api nans' => array(
+      'title' => t('Administer Search API Nans'),
+      'description' => t('View, Create, Edit and delete Nans.'),
+    ),
+    'add search api nans' => array(
+      'title' => t('Add Search API Nans'),
+      'description' => t('Add Nans - no edit or delete.'),
+    ),
+    'view search api nans' => array(
+      'title' => t('View Search API Nans'),
+      'description' => t('View Nans.'),
+    ),
+  );
+  return $permissions;
+}
+
+/**
+ * Determines whether the given user has access to a nan.
+ *
+ * @param $op
+ *   The operation being performed. One of 'view', 'update', 'create', 'delete'
+ *   or just 'edit' (being the same as 'create' or 'update').
+ * @param $nan
+ *   Optionally a nan to check access for. If nothing is
+ *   given, access for all nans is determined.
+ * @param $account
+ *   The user to check for. Leave it to NULL to check for the global user.
+ * @return boolean
+ *   Whether access is allowed or not.
+ */
+function search_api_nan_access_callback($op, $nan = NULL, $account = NULL) {
+  if (user_access('administer search api nans', $account)) {
+    return TRUE;
+  }
+  else if ($op == 'view' && user_access('view search api nans', $account)) {
+    return TRUE;
+  }
+  else if ($op == 'create' && user_access('add search api nans', $account)) {
+    //TODO: finish/test add only permission
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Required for hook_menu arg %nanentity.
+ */
+function nanentity_load($id) {
+  $nan = entity_load('search_api_nan', array($id));
+  return array_pop($nan);
+}
+
+/**
+ * Callback for viewing a single nan page.
+ *
+ * Just a place to render a complete nan entity.
+ */
+function nan_view_entity($nan) {  // Do I need this one or the next?
+//function nan_view_entity($id) {
+//  $nan = entity_load("search_api_nan", array($nan->nan_id => $nan));
+  $nan = entity_load("search_api_nan", array($nan->nan_id));
+  $nan = reset($nan);
+
+  drupal_set_title($nan->title);
+  $nan_entity = entity_view('search_api_nan', array($nan->nan_id => $nan));
+  kpr($nan_entity);
+  return $nan_entity;
+}
+
+
+
+/**
+ * Our custom entity class.
+ *
+ * The Entity class we're overriding is in
+ * sites/all/modules/contrib/entity/includes/entity.inc
+ */
+class NanEntity extends Entity {
+  /**
+   * Override this in order to implement a custom default URI.
+   */
+  protected function defaultUri() {
+    return array('path' => 'nan/' . $this->identifier());
+  }
+}
+
+/**
+ * UI controller.
+ */
+class NanEntityUIController extends EntityDefaultUIController {
+
+  /**
+   * Overrides hook_menu() defaults. Main reason for doing this is that
+   * parent class hook_menu() is optimized for entity type administration.
+   */
+//  public function hook_menu() {
+//
+//    $items = array();
+//    $id_count = count(explode('/', $this->path));
+//    $wildcard = isset($this->entityInfo['admin ui']['menu wildcard']) ? $this->entityInfo['admin ui']['menu wildcard'] : '%' . $this->entityType;
+//
+//    $items[$this->path] = array(
+//      'title' => 'Nans',
+//      'description' => 'Add edit and update nans.',
+//      'page callback' => 'system_admin_menu_block_page',
+//      'access arguments' => array('access administration pages'),
+//      'file path' => drupal_get_path('module', 'system'),
+//      'file' => 'system.admin.inc',
+//    );
+//
+//    // Change the overview menu type for the list of nans.
+//    $items[$this->path]['type'] = MENU_LOCAL_TASK;
+//
+//    // Change the add page menu to multiple types of entities
+////    $items[$this->path . '/add'] = array(
+////      'title' => 'Add a nan',
+////      'description' => 'Add a new nan',
+////      'page callback'  => 'nan_add_page',
+////      'access callback'  => 'search_api_search_api_nan_access',
+////      'access arguments' => array('edit'),
+////      'type' => MENU_NORMAL_ITEM,
+////      'weight' => 20,
+////      'file' => 'search_api_nan.admin.inc',
+////      'file path' => drupal_get_path('module', $this->entityInfo['module'])
+////
+////    );
+////
+////    // Add menu items to add each different type of entity.
+////    foreach (nan_get_types() as $type) {
+////      $items[$this->path . '/add/' . $type->type] = array(
+////        'title' => 'Add ' . $type->label,
+////        'page callback' => 'nan_form_wrapper',
+////        'page arguments' => array(nan_create(array('type' => $type->type))),
+////        'access callback' => 'search_api_nan_access',
+////        'access arguments' => array('edit', 'edit ' . $type->type),
+////        'file' => 'search_api_nan.admin.inc',
+////        'file path' => drupal_get_path('module', $this->entityInfo['module'])
+////      );
+//
+//    // Change the add page menu to multiple types of entities
+//    //todo: change it back to only 1 type of entity
+//    $items[$this->path . '/add'] = array(
+//      'title' => 'Add a nan',
+//      'description' => 'Add a new nan',
+//      'page callback'  => 'nan_add_page',
+//      'access callback'  => 'search_api_nan_access',
+//      'access arguments' => array('edit'),
+//      'type' => MENU_NORMAL_ITEM,
+//      'weight' => 20,
+//      'file' => 'search_api_nan.admin.inc',
+//      'file path' => drupal_get_path('module', $this->entityInfo['module'])
+//
+//    );
+//
+//
+//    // Loading and editing nan entities
+//    $items[$this->path . '/nan/' . $wildcard] = array(
+//      'page callback' => 'nan_form_wrapper',
+//      'page arguments' => array($id_count + 1),
+//      'access callback' => 'search_api_nan_access',
+//      'access arguments' => array('edit', $id_count + 1),
+//      'weight' => 0,
+//      'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+//      'file' => 'search_api_nan.admin.inc',
+//      'file path' => drupal_get_path('module', $this->entityInfo['module'])
+//    );
+//    $items[$this->path . '/nan/' . $wildcard . '/edit'] = array(
+//      'title' => 'Edit',
+//      'type' => MENU_DEFAULT_LOCAL_TASK,
+//      'weight' => -10,
+//      'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+//    );
+//
+//    $items[$this->path . '/nan/' . $wildcard . '/delete'] = array(
+//      'title' => 'Delete',
+//      'page callback' => 'nan_delete_form_wrapper',
+//      'page arguments' => array($id_count + 1),
+//      'access callback' => 'search_api_nan_access',
+//      'access arguments' => array('edit', $id_count + 1),
+//      'type' => MENU_LOCAL_TASK,
+//      'context' => MENU_CONTEXT_INLINE,
+//      'weight' => 10,
+//      'file' => 'search_api_nan.admin.inc',
+//      'file path' => drupal_get_path('module', $this->entityInfo['module'])
+//    );
+//
+//    // Menu item for viewing nans
+//    $items['nan/' . $wildcard] = array(
+//      //'title' => 'Title',
+//      'title callback' => 'nan_page_title',
+//      'title arguments' => array(1),
+//      'page callback' => 'nan_page_view',
+//      'page arguments' => array(1),
+//      'access callback' => 'search_api_nan_access',
+//      'access arguments' => array('view', 1),
+//      'type' => MENU_CALLBACK,
+//    );
+//    return $items;
+//  }
+//
+//
+//  /**
+//   * Create the markup for the add Nan Entities page within the class
+//   * so it can easily be extended/overriden.
+//   */
+//  public function addPage() {
+//    $item = menu_get_item();
+//    $content = system_admin_menu_block($item);
+//
+//    if (count($content) == 1) {
+//      $item = array_shift($content);
+//      drupal_goto($item['href']);
+//    }
+//
+//    return theme('nan_add_list', array('content' => $content));
+//  }
+
+}
+
+/**
+ * Our custom controller for the search_api_nan entity type.
+ *
+ * We're choosing to extend the controller provided by the entity module for
+ * full CRUD support for our entities.
+ *
+ * The EntityAPIController is found in
+ * sites/all/modules/contrib/entity/includes/entity.controller.inc
+ */
+class NanEntityAPIController extends EntityAPIController {
+
+  public function __construct($entityType) {
+    parent::__construct($entityType);
+  }
+
+  public function buildContent($entity, $view_mode = 'full', $langcode = NULL, $content = array()) {
+    $build = parent::buildContent($entity, $view_mode, $langcode, $content);
+
+    $build['description'] = array(
+      '#type' => 'markup',
+      '#prefix' => '<div>',
+      '#suffix' => '</div>',
+      '#markup' => 'Description: ' . $entity->description,
+    );
+
+    $build['urlpath'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div>' . 'URLPath: ' .$entity->urlpath .'</div>',
+    );
+    $build['frequency'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div>' . 'Frequency: ' .$entity->frequency .'</div>',
+    );
+    $build['auto_populate_body'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div>' . 'Auto Populate Body: ' .$entity->auto_populate_body .'</div>',
+    );
+    $build['body'] = array(
+      '#type' => 'markup',
+      '#markup' => '<div>' . 'Body: ' .$entity->body .'</div>',
+    );
+    $updated_at = date(DATE_RSS, $entity->updated_at) ;
+    $created_at = date(DATE_RSS, $entity->created_at) ;
+
+    $build['created_at'] = array(
+      '#type' => 'markup',
+      '#prefix' => '<div>',
+      '#suffix' => '</div>',
+      '#markup' => 'Created At: ' . $created_at,
+    );
+    $build['updated_at'] = array(
+      '#type' => 'markup',
+      '#prefix' => '<div>',
+      '#suffix' => '</div>',
+      '#markup' => 'Updated At: ' . $updated_at,
+    );
+
+    return $build;
+  }
+  /**
+   * Create a nan - we first set up the values that are specific
+   * to our nan schema.
+   *
+   * @param $type
+   *   The machine-readable type of the nan.
+   *
+   * @return
+   *   A nan object with all default fields initialized.
+   */
+  public function create(array $values = array()) {
+    // Add values that are specific to our Nan
+    $values += array(
+      'nan_id' => '',
+      'path' => '',
+      'description' => '',
+      'title' => '',
+      'frequency' => 0,
+      'last_indexed' => 0,
+      'auto_populate_content' => FALSE,
+      'body' => '',
+    );
+
+    $nan = parent::create($values);
+    return $nan;
+  }
+  /**
+   * Override save method.
+   *
+   * Populate created and updated dates automatically.
+   */
+  public function save($entity, DatabaseTransaction $transaction = NULL) {
+
+    if (isset($entity->is_new)) {
+      $entity->created_at = REQUEST_TIME;
+    }
+    $entity->updated_at = REQUEST_TIME;
+
+    return parent::save($entity, $transaction);
+  }
 }

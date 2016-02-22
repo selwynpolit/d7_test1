@@ -6,6 +6,73 @@
  * Administrative functions for Search API NAN .
  */
 
+
+//Todo: add config link on module page
+
+
+function search_api_nan_form($form, &$form_state, $naan = NULL) {
+  $form['name'] = array(
+    '#title' => t('Name'),
+    '#type' => 'textfield',
+    '#default_value' => isset($naan->name) ? $naan->name : '',
+    '#description' => t('Naan Name.'),
+    '#required' => TRUE,
+    '#weight' => -50,
+  );
+  $form['description'] = array(
+    '#title' => t('Description'),
+    '#type' => 'textfield',
+    '#default_value' => isset($naan->description) ? $naan->description : '',
+    '#description' => t('Description for admin use only.'),
+    '#required' => FALSE,
+  );
+  $form['urlpath'] = array(
+    '#title' => t('URL Path'),
+    '#type' => 'textfield',
+    '#default_value' => isset($naan->urlpath) ? $naan->urlpath : '',
+    '#description' => t('URL Path to the page without leading slash.'),
+    '#required' => TRUE,
+  );
+
+  $form['frequency'] = array(
+    '#title' => t('Frequency'),
+    '#type' => 'textfield',
+    '#default_value' => isset($naan->frequency) ? $naan->frequency : '0',
+    '#description' => t('The time between indexing in seconds.'),
+    '#required' => TRUE,
+  );
+  $form['auto_populate_body'] = array(
+    '#title' => t('Auto Populate Body (Y/N)'),
+    '#type' => 'radios',
+    '#options' => array(1 => t('Yes'), 0 => t('No')),
+    '#default_value' => isset($naan->auto_populate_body) ? $naan->auto_populate_body : 'N',
+    '#description' => t('Automatically load the contents of the path into the body field for indexing.'),
+    '#required' => TRUE,
+  );
+  $form['body'] = array(
+    '#title' => t('Body'),
+    '#type' => 'textarea',
+    '#wysiwyg' => false,
+//    '#type' => 'textfield',
+    '#default_value' => isset($naan->body) ? $naan->body : '',
+    '#description' => t('Content area of the page.  This is not usually required.'),
+    '#required' => FALSE,
+  );
+
+  // Adds the fieldable fields to the form.
+  field_attach_form('naan', $naan, $form, $form_state);
+
+  $form['actions'] = array(
+    '#type' => 'actions',
+    'submit' => array(
+      '#type' => 'submit',
+      '#value' => isset($naan->id) ? t('Update Naan') : t('Save Naan'),
+    ),
+  );
+
+  return $form;
+}
+
 /**
  * Builds the administration form for Search API NAN search.
  */
@@ -153,8 +220,6 @@ function search_api_nan_nan_settings_form($form, &$form_state, $nan = NULL) {
 //        '#required' => TRUE,
 //      );
 
-      // Adds the fieldable fields to the form.
-      field_attach_form('search_api_nan', $nan, $form, $form_state);
 
 
       $form['item'][$i]['delete'] = array(
