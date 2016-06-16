@@ -78,7 +78,7 @@ function naanentity_access_callback($op, $naanentity = NULL, $account = NULL) {
  */
 function naanentity_menu() {
   $items = array();
-  $items['naan/%naanentity'] = array(
+  $items['naan/%naanentity'] = array( //You need a naanentity_load() for this arg.
 //  $items['naan/%'] = array(
     'title' => 'Naan',
     'page callback' => 'naanentity_view_entity',
@@ -163,10 +163,10 @@ class NaanEntityUIController extends EntityDefaultUIController {
 }
 
 /**
- * Our custom controller for the videoentity type.
+ * Our custom controller for the naantity type.
  *
  * We're choosing to extend the controller provided by the entity module for
- * full CRUD support for videoentities.
+ * full CRUD support for naantities.
  *
  * The EntityAPIController is found in
  * sites/all/modules/contrib/entity/includes/entity.controller.inc

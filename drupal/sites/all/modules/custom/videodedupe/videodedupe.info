@@ -1,0 +1,6 @@
+name = VideoDedupe
+description = "video Node dedupe module taken from http://drupal.org/node/720190"
+core = 7.x
+package = Custom
+
+files[] = videodedupe.module

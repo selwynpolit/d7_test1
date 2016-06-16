@@ -1,0 +1,87 @@
+<?php
+
+/**
+ * @file
+ * Remove Duplicate Nodes.
+ */
+
+/**
+ * Implementation of hook_menu().
+ */
+function videodedupe_menu() {
+  $items['admin/content/dedupe'] = array(
+    'title' => 'Dedupe',
+    'description' => 'Delete Duplicate Nodes',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('videodedupe_content_command'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => NULL,
+  );
+  return $items;
+}
+/**
+ * Build Form
+ */
+function videodedupe_content_command() {
+  $options = array();
+  $types = node_type_get_types();
+  foreach ($types as $type) {
+    $options[$type->type] = $type->name;
+  }
+  $form['videodedupe_node_types'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('You can select content type from which duplicates are removed.'),
+    '#options' => $options,
+    //'#default_value' => variable_get('videodedupe_node_types', array('page')),
+    '#description' => t('Duplicate content from the selected content types will be deleted.'),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Dedupe'),
+  );
+  return $form;
+}
+/**
+ * Call delete function and set message.
+ */
+function videodedupe_content_command_submit($form, $form_state) {
+  $types_del = array();
+  $types = $form_state['values']['videodedupe_node_types'];
+  foreach ($types as $idx => $type) {
+    if ($type === 0) {
+      continue;
+    }
+    $types_del[] = $type;
+  }
+
+  $videodedupe_m = 'Duplicates deleted from content types: '. implode(", ",$types_del);
+  videodedupe_delete($types_del);
+  drupal_set_message(check_plain($videodedupe_m));
+}
+/**
+ * Delete duplicates from selected content type, based on title. By Robert Douglass.
+ * @see http://robshouse.net/blog-post/remove-duplicate-nodes-dedupe-based-title
+ */
+function videodedupe_delete($types_del) {
+  $prevobj = array();
+  $result = db_query("SELECT n.nid, n.title, n.created FROM {node} n
+    	inner join
+      	(SELECT title FROM node
+        	WHERE type in (:types)
+        	GROUP BY title HAVING count(*) > 1) n2
+     	on n.title = n2.title
+    ORDER BY title, created, nid DESC", array(':types' => $types_del));
+
+  foreach ($result as $obj) {
+    if ($obj->title == $prevobj->title) {
+      node_delete((int)$obj->nid);
+      drupal_set_message("Deleted node nid={$obj->nid}, title={$obj->title}, created={$obj->created}");
+    }
+    else {
+      drupal_set_message("Kept node nid={$obj->nid}, title={$obj->title}, created={$obj->created}");
+    }
+    $prevobj = $obj;
+  }
+}
+
