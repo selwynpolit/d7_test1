@@ -1,0 +1,115 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function batchpurge_menu() {
+  $items['purgem1'] = array(
+  'title' => 'Batch Purge Users Results',
+    'page callback' => '_batchpurge1',
+    'access callback' => TRUE,
+  );
+  $items['purgem2'] = array(
+    'title' => 'Batch Purge Users using Batch API',
+    'page callback' => '_batchpurge2',
+    'access callback' => TRUE,
+  );
+
+  return $items;
+}
+
+/**
+ * Callback for /purgem2 using Batch API.
+ */
+function _batchpurge2() {
+  $batch = array(
+    'title' => t('Purging Users'),
+    'init_message' => t('Purging users is starting.'),
+    'operations' => array(
+      array('_batchpurge2_callback', array()),
+    ),
+    'finished' => '_batchpurge2_finished_callback',
+//    'file' => 'batchpurge/batchpurge.module',
+    'file' => drupal_get_path('module','batchpurge') . '/batchpurge.module',
+  );
+  batch_set($batch);
+  // Only needed if not inside a form _submit handler.
+  // Setting redirect in batch_process.
+  batch_process('<front>');
+}
+
+/**
+ * Callback for _batchpurge2 using Batch API to purge users
+ *
+ * @return string
+ */
+function _batchpurge2_callback(&$context) {
+  if (empty($context['sandbox'])) {
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['current_uid'] = 0;
+//    $context['sandbox']['max'] = db_query("SELECT COUNT(*) FROM {users} where mail like '%@d7_test1.local.invalid%'")->fetchField();
+  }
+  $limit = 5;
+  $query = db_select('users','u');
+  $query->fields('u',array('uid','name','mail'));
+//  $query->condition('mail','%'. db_like('@localhost') . '%','LIKE');
+  $query->condition('mail','%'. db_like('@d7_test1.local.invalid') . '%','LIKE');
+  $query->orderBy('uid');
+  $results = $query->execute();
+
+  $context['sandbox']['max'] = $results->rowCount();
+  foreach ($results as $row) {
+    $user = user_load($row->uid);
+    usleep(250000);
+//    user_delete($row->uid);
+
+    $context['results'][] = $row->uid . ' : ' . check_plain($row->mail);
+    $context['sandbox']['progress']++;
+    $context['sandbox']['current_uid'] = $row->uid;
+    $context['message'] = "Processing: " . check_plain($row->mail);
+  }
+  if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  }
+
+//  return 'Hello from batch purge!';
+}
+
+function _batchpurge2_finished_callback($success, $results, $operations) {
+  // The 'success' parameter means no fatal PHP errors were detected. All
+  // other error management should be handled using 'results'.
+  if ($success) {
+    $message = format_plural(count($results), 'One user processed.', '@count users processed.');
+  }
+  else {
+    $message = t('Finished with an error.');
+  }
+  drupal_set_message($message);
+  // Providing data for the redirected page is done through $_SESSION.
+  foreach ($results as $result) {
+    $items[] = t('Process %title.', array('%title' => $result));
+  }
+  $_SESSION['my_batch_results'] = $items;
+}
+
+function _batchpurge1() {
+  $query = db_select('users','u');
+  $query->fields('u',array('uid','name','mail'));
+//  $query->condition('mail','%'. db_like('@localhost') . '%','LIKE');
+  $query->condition('mail','%'. db_like('@d7_test1.local.invalid') . '%','LIKE');
+  $query->orderBy('uid');
+  $results = $query->execute();
+
+  $count = $results->rowCount();
+
+  drupal_set_message("Results: " . $count);
+
+//  $return = "<h2>Batch Purge here</h2><br/>";
+  foreach ($results as $result) {
+//    drupal_set_message("Deleted: " . $result->uid . ' ' . $result->mail);
+//    user_delete((int) $result->uid);
+      $return .= "Deleted: " . $result->uid . ' ' . $result->mail . "<br/>";
+  }
+  return $return;
+}
+
