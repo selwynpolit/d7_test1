@@ -1,2 +1,58 @@
 <?php
+/**
+ * Purge malformed user records.
+ */
+function batchpurge_update_7011(&$sandbox) {
 
+  $batch_size = 10;
+
+  // If this is the first pass through this update function then set some variables.
+  if (!isset($sandbox['total'])) {
+    $sandbox['total'] = db_query("SELECT COUNT(*) FROM {users} where mail like '%@d7_test1.local.invalid%'")->fetchField();
+    $sandbox['current'] = 0;
+    drupal_set_message(t('There are @batch_size users to process.', array('@batch_size' => $sandbox['total'])));
+
+  }
+  if ($sandbox['total'] == 0) {
+    $sandbox['#finished'] = 1;
+    return;
+  }
+  //Go get my list of uid's to delete, note $batch_size limit.
+  $query = db_select('users','u');
+  $query->fields('u',array('uid','name','mail'));
+//  $query->condition('mail','%'. db_like('@localhost') . '%','LIKE');
+  $query->condition('mail','%'. db_like('@d7_test1.local.invalid') . '%','LIKE');
+  $query->range(0,$batch_size);
+  $query->orderBy('uid');
+  $results = $query->execute();
+
+
+//  $context['sandbox']['max'] = $results->rowCount();
+  foreach ($results as $row) {
+    $user = user_load($row->uid);
+    usleep(100000);
+//    user_delete($row->uid);
+
+    $sandbox['current']++;
+//    $sandbox['message'] = "Processing: " . check_plain($row->mail);
+
+  }
+  if ($sandbox['current'] != $sandbox['total']) {
+    $sandbox['finished'] = $sandbox['current']; //Update progress bar for interactive.
+    $sandbox['#finished'] = $sandbox['current'] / $sandbox['total'];
+    $sandbox['init_message'] = t('Processed @current out of @total.');
+//    drupal_set_message(t('Processed @batch_size users.', array('@batch_size' => $sandbox['current'])));
+  }
+
+
+  // Set the value for finished. If current > total then finish.
+  if ($sandbox['current'] / $sandbox['total'] >= 1) {
+    $sandbox['#finished'] = 1;
+  }
+
+  if ($sandbox['#finished'] == 1) {
+    drupal_set_message(t('Processed all @records records.', array('@records' => $sandbox['total'])));
+  }
+
+
+}

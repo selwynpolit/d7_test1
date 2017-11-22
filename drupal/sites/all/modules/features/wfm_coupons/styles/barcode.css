@@ -1,0 +1,112 @@
+/* css barcode */
+/* by rexfeng 2012 */
+
+html, body {height: 200px;}
+
+body {
+    background-color: #fff;
+    padding: 1px;
+    color: #000;
+    font-family: Helvetica, Arial;
+}
+
+.holder {
+    position: relative;
+    margin: 10px auto;
+}
+
+#query {
+    padding: 8px;
+    width: 140px;
+    background: #eee;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    color: #888;
+    font-size: 10px;
+    margin-top: 15px;
+}
+
+#query a {
+    text-decoration: none;
+    color: blue;
+}
+
+#barcodenum {
+}
+
+.instructions {
+    color: #333;
+}
+
+#upc-a {
+    background: #fff;
+    border-radius: 5px;
+    border: 1px solid #000;
+    width: 152px;
+    padding: 4px;
+}
+
+#upc-wrap {
+    width: 155px;
+    height: 84px;
+    padding-bottom: 5px;
+}
+
+.m { /* module 1px *3 width */
+    width: 0.1em;
+    height: 90px;
+    display: inline-block;
+    vertical-align: top;
+}
+
+.long {
+    height: 93px;
+}
+
+.o {
+    background-color: #fff;
+}
+
+.e {
+    background-color: #000;
+}
+
+.l {
+    display: inline-block;
+}
+
+.r {
+    display: inline-block;
+}
+
+.r .o.m {
+    background-color: #000;
+}
+
+.r .e.m {
+    background-color: #fff;
+}
+
+#l1, #l2, #l3, #l4, #l5, #l6 {
+    display: inline-block;
+}
+
+#r1, #r2, #r3, #r4, #r5, #r6 {
+    display: inline-block;
+}
+
+.digits {
+    font-family: monospace, Courier;
+    font-size: 1em;
+    display: inline;
+    position: relative;
+    letter-spacing: 2px;
+}
+
+#l-digits {
+    margin-left: 5px;
+}
+
+#r-digits {
+    margin-left: 12px;
+}

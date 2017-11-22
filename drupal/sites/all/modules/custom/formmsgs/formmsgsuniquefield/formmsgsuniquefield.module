@@ -1,0 +1,117 @@
+<?php
+
+/**
+ * Implements hook_formmsgs_form_messages().
+ */
+function formmsgsuniquefield_formmsgs_form_messages() {
+  $formmsgs = array();
+  $node_types = array_keys(node_type_get_types());
+  foreach ($node_types as $node_type) {
+    // Make the node-type-specific form ID.  We use drupal_html_class() and not
+    // drupal_html_id() because the ID safe function has a counting mechanism.
+    // Unfortunately, HTML ID forks character replacement handled for HTML class
+    // by drupal_clean_css_identifier(), aside from being different by design
+    // for second or more duplication of a form on a page.
+    $form_id = drupal_html_class($node_type . '-node-form');
+    $fields = variable_get('unique_field_fields_' . $node_type, array());
+    // Check if there are unique fields for this node type before proceeding.
+    if (count($fields)) {
+      // Get unique field settings for this node type for the message.
+      $scope = variable_get('unique_field_scope_' . $node_type, UNIQUE_FIELD_SCOPE_TYPE);
+      $comp = variable_get('unique_field_comp_' . $node_type, UNIQUE_FIELD_COMP_EACH);
+      $var_show_matches = variable_get('unique_field_show_matches_' . $node_type, array());
+      $show_matches = is_array($var_show_matches) && in_array(UNIQUE_FIELD_SHOW_MATCHES, $var_show_matches);
+
+      foreach ($fields as $field) {
+        $formmsgs['formmsgsuniquefield_' . $field] = array(
+          'form_id' => $form_id,
+          'element_name' => formmsgs_rationalize_field_name($field),
+          'callback' => 'formmsgsuniquefield_callback',
+          'default_message' => t('Let us think positive'),
+        );
+      }
+    }
+  }
+  return $formmsgs;
+}
+
+/**
+ * Handle all usual Unique Field AJAX requests.
+ */
+function formmsgsuniquefield_callback($value, $context = array()) {
+  $result = array('result' => TRUE, 'message' => 'Everything is copacetic.');
+  // Get unique field settings for this node type.
+  $node_type = $context['bundle'];
+  $scope = variable_get('unique_field_scope_' . $node_type, UNIQUE_FIELD_SCOPE_TYPE);
+  $comp = variable_get('unique_field_comp_' . $node_type, UNIQUE_FIELD_COMP_EACH);
+  $var_show_matches = variable_get('unique_field_show_matches_' . $node_type, array());
+  $show_matches = is_array($var_show_matches) && in_array(UNIQUE_FIELD_SHOW_MATCHES, $var_show_matches);
+  // Set field from context because we use the same callback for all fields.
+  $field = $context['field_name'];
+  // Set node language from context.
+  $language = $context['language'];
+
+  // $scope === UNIQUE_FIELD_SCOPE_NODE) is something of a silly one which, if
+  // we choose to do it at all, would be done entirely in JavaScript: ensuring
+  // each listed field is unique within a node alone (no database needed).
+
+  // We do not want the overhead of passing in all other field values unless
+  // we are doing the UNIQUE_FIELD_COMP_ALL comparison.  Unlike Unique Field
+  // module itself, then, we will treat UNIQUE_FIELD_COMP_ALL as a special case.
+
+  // @TODO - ensure UNIQUE_FIELD_FIELDS_AUTHOR and UNIQUE_FIELD_FIELDS_LANGUAGE
+  // return the right value from the form (uid and language).  Probably just
+  // do this by default in the context.
+
+  // Values are expected by the unique_field_match_value() function in the form
+  // $values[$index][$key] = $val;  Typical single-column fields key is 'value'.
+  $values = array();
+  if (is_string($value)) {
+    $values = array(
+      '0' => array(
+        'value' => $value,
+      ),
+    );
+  }
+  $match = unique_field_match_value($field, $values, $scope, $node_type, $language);
+  // Remove matches of this node.
+  if ($context['nid'] && is_array($match) && in_array($context['nid'], $match)) {
+    $key = array_search($node->nid, $match);
+    unset($match[$key]);
+  }
+  $errmsg = NULL;
+  // for debugging
+  $result['field'] = $field;
+  $result['match'] = $match;
+  $result['values'] = $values;
+  $result['scope'] = $scope;
+  $result['node_type'] = $node_type;
+
+  if ($comp === UNIQUE_FIELD_COMP_EACH && is_array($match) && count($match)) {
+    $result['result'] = FALSE;
+    $errmsg = t('The @label field requires a unique value, and the specified value is already used.');
+  }
+
+  // @TODO: Check for fields in combination ($comp === UNIQUE_FIELD_COMP_ALL)
+  // Requires a lot of context, or something.
+
+  if ($errmsg) {
+    // Temporary quick cludge.
+    $label = $field;
+    $result['message'] = strtr($errmsg, array('@label' => check_plain($label)));
+  }
+
+  if ($show_matches && is_array($match) && count($match)) {
+    $list_items = array();
+    foreach ($match as $nid) {
+      $match_node = node_load($nid);
+      if (node_access('view', $match_node)) {
+        $list_items[] = l($match_node->title, 'node/' . $nid);
+      }
+    }
+    $list_html = theme('item_list', array('items' => $list_items));
+    $result['message'] .= ' ' . t('Matches are found in the following content: !list-html', array('!list-html' => $list_html));
+  }
+
+  drupal_json_output($result);
+}

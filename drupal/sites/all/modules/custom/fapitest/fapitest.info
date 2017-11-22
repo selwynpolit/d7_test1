@@ -1,0 +1,5 @@
+name = Fapitest
+description = selwyn forms api test
+core = 7.x
+version = "7.x-1.0"
+project = "Selwyn"

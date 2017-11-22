@@ -1,0 +1,12 @@
+name = AJAX Form Messages User
+description = "[formmsgsuser] Inline feedback for suitability of usernames using the Client Validation module's framework."
+package = AJAX form messages
+core = 7.x
+dependencies[] = formmsgs
+
+; Information added by drupal.org packaging script on 2013-09-30
+version = "7.x-1.x-dev"
+core = "7.x"
+project = "formmsgs"
+datestamp = "1380580022"
+

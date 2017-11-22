@@ -1,7 +1,7 @@
 <?php
 /**
  * Created by PhpStorm.
- * User: selwyn.polit
+ * User: Selwyn Polit
  * Date: 3/10/15
  * Time: 10:50 AM
  */
@@ -9,15 +9,34 @@
 
 /**
  * Implements hook_menu().
- */
-function my_module_menu() {
-  $items = array();
-  $items['bapitest/batch_fix'] = array(
-    'title' => 'Batch fix',
-    'page callback' => 'bapitest_batch_fix',
-    'access arguments' => array('administer users'),
+ **/
+function bapitest_menu() {
+  //$items = array();
+
+  $items['test_abc'] = array(
+    'title' => 'Test ABC',
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'bapitest_abc',
+    'access callback' => TRUE,
+    'menu_name' => 'navigation',
   );
+
+
+  $items['batch_fix'] = array(
+    'title' => 'Batch fixer',
+    'page callback' => 'bapitest_batch_fix',
+    'access callback' => TRUE,
+  );
+
   return $items;
+}
+
+/**
+ * test code
+ * @return string
+ */
+function bapitest_abc() {
+  return 'yep - abc here!';
 }
 
 /**
@@ -32,26 +51,75 @@ function bapitest_batch_fix() {
     'progress_message' => t('Processed @current out of @total.'),
     'error_message' => t('Fix has encountered an error.')
   );
-  $results = array("Hello", "World");
-  foreach ($results as $result) {
-    $batch['operations'][] = array('bapitest_batch_fix_process', array($result));
+  // how many records to delete?
+  $num_to_delete = db_select('redirect', 'r')
+    ->condition('count', '0')
+    ->countQuery()
+    ->execute()
+    ->fetchField();
+
+  $batch_size = 5000;
+  if ($num_to_delete > 0) {
+    $num_of_batches = round($num_to_delete / $batch_size, 0, PHP_ROUND_HALF_DOWN);
+    $remainder = $num_to_delete % $batch_size;
+
+    // loop through each batch to call the delete process
+    for ($i = 0; $i < $num_of_batches; $i++) {
+      $batch_info = array(
+        'batch_size' => $batch_size,
+        'batch_num' => $i,
+        'batches' => $num_of_batches + 1, //include last pass
+      );
+      $batch['operation'][] = array(
+        'bapitest_batch_process',
+        array($batch_info)
+      );
+    }
+
+    //last pass to process the remainder
+    if ($remainder > 0) {
+      $batch_info['batch_num'] = $i + 1;
+      $batch_info['batch_size'] = $remainder;
+      $batch['operation'][] = array(
+        'bapitest_batch_process',
+        array($batch_info)
+      );
+    }
+
+    /*$results = array("Hello", "World");
+    foreach ($results as $result) {
+      $batch['operations'][] = array('bapitest_batch_process', array($result));
+    }*/
+
+    batch_set($batch);
+
+    batch_process('user'); // The path to redirect to when done.
+
   }
-  batch_set($batch);
-  batch_process('user'); // The path to redirect to when done.
 }
 
 /**
  * The batch processor.
+ * @param $batch_info
+ * @param $context
  */
-function bapitest_batch_fix_process($word, &$context) {
-  // Do heavy lifting here...
+function bapitest_batch_process($batch_info, &$context) {
+  // Do heavy lifting here..
+  $num_deleted = db_delete('redirect')
+    ->condition('count', '0')
+    ->range(0, $info['batch_size'])
+    ->execute();
 
   // Display a progress message...
-  $context['message'] = "Now processing $word...";
+  $context['message'] = "Now processing batch" . $batch_info['batch_num'] . "of " .
+    $batch_info['batches'] . "...";
 }
 
 /**
  * The batch finish handler.
+ * @param $success
+ * @param $results
+ * @param $operations
  */
 function bapitest_batch_fix_finished($success, $results, $operations) {
   if ($success) {
@@ -65,5 +133,5 @@ function bapitest_batch_fix_finished($success, $results, $operations) {
     ));
     drupal_set_message($message, 'error');
   }
-  drupal_set_message(l('Run again', 'bapitest/batch_fix'));
+  drupal_set_message(l('Run again', 'batch_fix'));
 }

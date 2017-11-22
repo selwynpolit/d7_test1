@@ -1,0 +1,39 @@
+<?php
+/**
+ * @file
+ * For now, a direct implementation of deep clientside_validation APIs.
+ * Eventually it would be good for formmsgs API modules to not know about
+ * clientside_validation directly, and implement formmsgs APIs.
+ */
+
+/**
+ * Implements hook_formmsgs_form_messages().
+ */
+function formmsgsnode_formmsgs_form_messages($form_id = NULL) {
+  return array(
+    'check_duplicate_title' => array(
+      'form_id' => array('*'),
+      'element_name' => 'title',
+      'callback' => 'formmsgsnode_unique_title',
+      'default_message' => t('Think three times, punk.'),
+    ),
+  );
+}
+
+/**
+ * Check if provided value is a unique node title for a given content type.
+ */
+function formmsgsnode_unique_title($value, $context = array()) {
+  $result = array();
+  // We assume there is no conflict by default.
+  $result['result'] = TRUE;
+
+  // We could use entity_load() here but surely direct databse check is faster.
+  $match = db_query('SELECT COUNT(*) FROM {node} WHERE title = :title AND type = :type', array(':title' => $value, ':type' => $context['bundle']))->fetchField();
+
+  if ($match) {
+    $result['result'] = FALSE;
+    $result['message'] = 'use default because you will anyway';
+  }
+  drupal_json_output($result);
+}

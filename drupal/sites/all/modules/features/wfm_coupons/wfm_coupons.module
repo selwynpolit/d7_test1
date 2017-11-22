@@ -1,0 +1,578 @@
+<?php
+/**
+ * @file
+ * Code for the wfm_coupons feature.
+ */
+
+include_once 'wfm_coupons.features.inc';
+
+/**
+ * Implements hook_views_api_alter().
+ */
+function wfm_coupons_views_api_alter(&$list) {
+  //change templates path for wfm_coupons module
+  $list['wfm_coupons']['template path'] = drupal_get_path('module', 'wfm_coupons') . '/templates';
+}
+
+
+/**
+ *  Implements hook_menu().
+ */
+function wfm_coupons_menu() {
+  $items = array();
+  $items['coupons'] = array(
+    'page callback' => 'wfm_coupons_page_callback',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+  );
+  $items['coupons/%'] = array(
+    'page callback' => 'wfm_coupons_page_callback',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+  );
+  $items['sales-flyer'] = array(
+    'page callback' => 'wfm_coupons_page_callback',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+  );
+  $items['sales-flyer/%'] = array(
+    'page callback' => 'wfm_coupons_page_callback',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+  );
+  return $items;
+}
+
+/**
+ *  Page callback function for hook_menu().
+ */
+function wfm_coupons_page_callback() {
+  _wfm_coupons_store_nid_redirect();
+  $title = t('Sales and Coupons');
+  drupal_set_title($title);
+  _wfm_coupons_set_breadcrumb($title);
+  $out = array();
+  $settings = array();
+  $country = _wfm_coupon_get_country();
+
+  switch (arg(0)) {
+    case 'coupons': 
+      $settings['default_tab'] = 1;
+      break;
+    case 'sales-flyer':
+      $settings['default_tab'] = 0;
+      break;
+  }
+  
+  $custom_tabs = _wfm_coupons_build_custom_quicktabs();
+  if ($custom_tabs) {
+
+    $out['sharelinks'] = array(
+      '#markup' => core_apitoken_print_and_share(FALSE),
+    );
+    $out['quicktabs'] = quicktabs_build_quicktabs('custom_quicktab_sales_coupons', $settings, $custom_tabs);
+    $out['disclaimer'] = array(
+      '#prefix' => '<div class="disclaimer">',
+      '#markup' => '<p>' . _wfm_coupons_legal_bs($country) . '</p>',
+      '#suffix' => '</div>',
+    );
+  }
+  return $out;
+}
+
+/**
+ * Get coupon legal language by country.
+ * @param string $country readable country to be used in text
+ * @return string
+ */
+function _wfm_coupons_legal_bs($country) {
+  $endOfStringIndex = strlen($country) - 1;
+
+  // 'U.S.A.' has a period at the end, and we don't want the end of a sentence to be 'U.S.A..',
+  // so get rid of the extra period for countries whose last character is a period.
+  if (strrpos($country, '.') === $endOfStringIndex) {
+    $adjustedCountryName = substr($country, 0, $endOfStringIndex);
+  } else {
+    $adjustedCountryName = $country;
+  }
+
+  return t('Limit one coupon per individual per purchase of specified product(s). Quantities are limited and may not be available in all stores; no rain checks.  Prices may vary.  We reserve the right to correct errors. Void to the extent prohibited or restricted by law or if altered, transferred, reproduced, exchanged, sold or purchased. No monetary value. Valid only in ' . $adjustedCountryName . '. Not valid at 365 by Whole Foods Market™ locations.');
+}
+
+/**
+ * Get readable country name to be used in legal text.
+ * @return string
+ */
+function _wfm_coupon_get_country() {
+  $store = _wfm_coupons_get_selected_store();
+  $country = 'the U.S.A.';
+  if (is_object($store)) {
+    $country_tid = store_get_country_by_nid($store->nid);
+    if ($country_tid == '94296') {
+      $country = 'Canada';
+    }
+  }
+  return $country;
+}
+
+/**
+ * Implements hook_api_tokens_info().
+ */
+function wfm_coupons_api_tokens_info() {
+  $tokens = array();
+  $tokens['sales_coupons_no_store_selected'] = array(
+    'title' => 'Sales / Coupons No Store Selected Header Text',
+    'description' => 'Renders text on sales/coupons page when there is no store selected',
+  );
+  return $tokens;
+}
+
+/**
+ * Implements hook_apitoken_*
+ * Returns 'no store selected text' for sales/coupons in case that no store is selected
+ * and no store is in the path.
+ */
+function wfm_coupons_apitoken_sales_coupons_no_store_selected() {
+  if (module_exists('wfm_template_text')) {
+    $selected_store = store_get_user_store();
+    $theme = variable_get('theme_default');
+    $store_in_path = FALSE;
+
+    if ($theme == 'wholefoods') {
+      $store_in_path = arg(1);
+    }
+    elseif ($theme == 'wholefoods_mobile') {
+      $store_in_path = arg(2);
+    }
+
+    if ((!$selected_store || $selected_store->type != 'store') && !$store_in_path) {
+      $text = wfm_template_text_get_text('wfm_template_text_no_store_selected');
+      return $text;
+    }
+  }
+  return false;
+}
+
+/**
+ * Builds a custom quicktab instance for /coupons and /sales-flyer.
+ * If a store is selected it return the tab content, otherwise returns nothing.
+ * @return array
+ *   Renderable array containing quicktabs.
+ */
+function _wfm_coupons_build_custom_quicktabs() {
+  $tabs = array(
+    0 => array(
+      'title' => wfm_template_text_get_text('wfm_template_text_sales_coupons_sales_tab_label'),
+      'contents' => array(
+        '#markup' => '<h2>Sales</h2>',
+      ),
+    ),
+    1 => array(
+      'title' => wfm_template_text_get_text('wfm_template_text_sales_coupons_coupons_tab_label'),
+      'contents' => array(
+        '#markup' => '<h2>Coupons</h2>',
+      ),
+    ),
+  );
+
+  $store = _wfm_coupons_get_selected_store();
+  if ($store) { // If we have a store.
+    $sales_block = module_invoke('products', 'block_view', 'sale_items'); // Sales items.
+    $sidebar_block = _wfm_coupons_get_sidebar(); // Sidebar for both coupons and sales tabs.
+    $coupons = drupal_get_form('wfm_coupons_print_form', $store->nid);
+    $pdf_download = _wfm_coupons_get_pdf_link($store);
+
+    $tabs[0]['contents']['#markup'] = $pdf_download . $sales_block['content'] . $sidebar_block;
+    $tabs[1]['contents']['#markup'] = render($coupons) . $sidebar_block;
+    
+    return $tabs;
+  }
+}
+
+/**
+ * Determines and returns selected store.
+ * @return object
+ *   Store node object.
+ */
+function _wfm_coupons_get_selected_store() {
+  // If we have a storename in the url.
+  $store = &drupal_static(__FUNCTION__);
+  if (!$store) {
+    if (arg(1)) {
+      $storename = check_plain(arg(1));
+      $storenid = store_get_storenid_from_store_name($storename);
+      if ($storenid) {
+        $store = node_load($storenid);
+      }
+    }
+    // If we don't have a store name in the path.
+    if (!$store) {
+      $store = store_get_user_store();
+    }
+    if (is_object($store) && $store->type !== 'store') {
+      $store = FALSE;
+    }
+  }
+  return $store;
+}
+
+/**
+ * Builds link to sales flier pdf download on www2.
+ * @param object $store
+ *   Store node object.
+ * @return string
+ *   Link to pdf.
+ */
+function _wfm_coupons_get_pdf_link($store) {
+  $tlc = store_get_tlc_by_nid($store->nid);
+  $base_url = variable_get('wfm_variable__specials_pdf_url');
+  $url = '//' . $base_url . $tlc . '_specials.pdf';
+  $text = wfm_template_text_get_text('wfm_template_text_sales_coupons_pdf_download_text');
+  return l($text, $url, array(
+    'attributes' => array(
+      'class' => array('sales-flyer-pdf'),
+    ),
+  ));
+}
+
+/**
+ * Get Whole Deal sidebar.
+ */
+function _wfm_coupons_get_sidebar() {
+  $block = module_invoke('block', 'block_view', '15'); // Existing block created in DB.
+  return '<div class="wfm-coupons-sidebar-block">' . $block['content'] . '</div>';
+}
+
+/** 
+ * Set page breadcrumb.
+ */ 
+function _wfm_coupons_set_breadcrumb($title) {
+  $store = _wfm_coupons_get_selected_store();
+  $breadcrumb = array();
+  $breadcrumb[] = l(t('Home'), '<front>');
+  if ($store) {
+    $breadcrumb[] = l($store->title, drupal_get_path_alias('node/' . $store->nid));
+  }
+  $breadcrumb[] = l($title, base_path() . request_uri());
+  drupal_set_breadcrumb($breadcrumb);
+}
+
+/**
+ *  Implements hook_views_pre_execute().
+ */
+function wfm_coupons_views_pre_execute(&$view) {
+  if ($view->name == 'coupons' && $view->current_display != 'page_1') {
+    if (variable_get('theme_default') == 'wholefoods_mobile') {
+      // Mobile always has store in path when displaying coupons.
+      $store_nick = arg(2);
+    }
+    else {
+      if (arg(1)) {
+        $store_nick = arg(1);
+      }
+      else {
+        $store = _wfm_coupons_get_selected_store();
+        $store_nick = $store->field_store_name[LANGUAGE_NONE][0]['value'];
+      }
+    }
+    $country_id = _wfm_coupons_get_country_code($store_nick);
+    if (isset($country_id)) {
+      $items = _wfm_coupons_get_national_nodes($country_id);
+      $view->national_coupons = $items;
+      $view->total_national = count($items);
+    }
+  }
+}
+
+/**
+ * Returns country code based on store nickname
+ *
+ * @param string $store_nick
+ * Store Nickname
+ *
+ * @return int $results
+ * Store country code
+ */
+function _wfm_coupons_get_country_code($store_nick) {
+  $results = &drupal_static(__FUNCTION__);
+  if (!$results) {
+    $query = db_select('field_data_field_store_name', 'n')
+      ->fields('c', array('field_national_office_nid'))
+      ->condition('n.field_store_name_value', $store_nick, '=');
+    $query->leftJoin('field_data_field_national_office', 'c', 'c.entity_id=n.entity_id');
+    $results = $query->execute()->fetchField(0);
+  }
+  return $results;
+}
+
+/**
+ * Returns mobile regioncode based on store nickname
+ *
+ * @param string $store_nick
+ * Store Nickname
+ *
+ * @return int $results
+ * Store country code
+ */
+function _wfm_coupons_get_mobile_region_code($store_nick) {
+  $query = db_select('field_data_field_store_name', 'n')
+    ->fields('n', array('entity_id'))
+    ->condition('n.field_store_name_value', $store_nick, '=');
+  $results = $query->execute()->fetchField(0);
+
+  return store_get_region_by_nid($results);
+}
+
+/**
+ * Countries without regions.
+ *
+ * This returns the National Coupons identified by coupons with
+ * node references but region value of null
+ *
+ * @param int $country_id
+ * Country id.
+ *
+ * @return array
+ * @TODO: what is in this array
+ */
+function _wfm_coupons_get_national_nodes($country_id) {
+  $query = db_select('field_data_field_coupon_country', 'c')
+    ->fields('c', array('field_coupon_country_nid', 'entity_id'))
+    ->fields('r', array('field_coupon_region_nid', 'entity_id'))
+    ->fields('h', array('field_coupon_headline_value'))
+    ->fields('o', array('field_coupon_offer_value'))
+    ->fields('i', array('field_coupon_image_fid'))
+    ->fields('fm', array('fid', 'filename', 'uri'))
+    ->fields('p', array('field_coupon_plu_value'))
+    ->fields('n', array('nid'))
+    ->condition('c.field_coupon_country_nid', $country_id, '=')
+    ->condition('n.status', 1, '=');
+  $query->leftJoin('field_data_field_coupon_region', 'r', 'r.entity_id=c.entity_id');
+  $query->leftJoin('node', 'n', 'n.nid=c.entity_id');
+  $query->leftJoin('field_data_field_coupon_headline', 'h', 'h.entity_id=c.entity_id');
+  $query->leftJoin('field_data_field_coupon_image', 'i', 'i.entity_id=c.entity_id');
+  $query->leftJoin('file_managed', 'fm', 'fm.fid = i.field_coupon_image_fid');
+  $query->leftJoin('field_data_field_coupon_offer', 'o', 'o.entity_id=c.entity_id');
+  $query->leftJoin('field_data_field_coupon_plu', 'p', 'p.entity_id=c.entity_id');
+  $query->isNull('r.entity_id');
+  $results = $query->execute()->fetchAll();
+  return $results;
+}
+
+/**
+ *  Implements hook_views_pre_render().
+ */
+function wfm_coupons_views_pre_render(&$view) {
+  $next_row = count($view->result);
+  $total_national = 0;
+  if (isset($view->total_national)) {
+    $total_national = $view->total_national;
+  }
+  while ($total_national > 0) {
+    $item = $view->national_coupons[$total_national - 1];
+    if ($item->entity_id!= $view->result[0]->nid) {
+      $item->field_field_coupon_headline[0]['rendered']['#markup'] = $item->field_coupon_headline_value;
+      $item->field_field_coupon_offer[0]['rendered']['#markup'] = $item->field_coupon_offer_value;
+      $item->field_field_coupon_plu[0]['rendered']['#markup'] = $item->field_coupon_plu_value;
+      $item->field_field_coupon_image[0]['rendered']['#theme'] = 'image_formatter';
+      $item->field_field_coupon_image[0]['rendered']['#item']['fid'] = $item->field_coupon_image_fid;
+      $item->field_field_coupon_image[0]['rendered']['#item']['uri'] = $item->uri;
+      $item->field_field_coupon_image[0]['rendered']['#item']['filename'] = $item->filename;
+      $item->field_field_coupon_image[0]['rendered']['#item']['field_folder']['und'][0]['tid'] = '86';
+      // TODO @research if ok to hardcode media root tid like this ^^
+      array_splice($view->result, $next_row, 1, array($item));
+    }
+    $total_national--;
+    $next_row++;
+  }
+}
+
+/**
+ * Form constuctor function.
+ * @param array $form
+ *   Form renderable array.
+ * @param array $form_state
+ *   $form_state array.
+ * @param string $storenid
+ *   Store node id.
+ */
+function wfm_coupons_print_form($form, &$form_state, $storenid) {
+  $location = array(
+    'region'  => store_get_region_by_nid($storenid),
+    'country' => store_get_country_by_nid($storenid),
+  );
+  
+  $coupon_results = (views_embed_view('coupons', 'block', $location['region'], $location['country']));
+
+  $form = array();
+
+  if (strpos($coupon_results, 'view-empty') === FALSE) { // If there's not a .view-empty class on the wrapping div.
+    $form['select_all_wrapper'] = array(
+      '#type' => 'fieldset',
+      '#collapsible' => FALSE,
+    );
+    $form['select_all_wrapper']['select_all_coupons'] = array(
+      '#type' => 'checkbox',
+      '#title' => wfm_template_text_get_text('wfm_template_text_coupons_select_all'),
+    );
+    $form['select_all_wrapper']['form_submit'] = array(
+      '#type' => 'submit',
+      '#value' => wfm_template_text_get_text('wfm_template_text_coupons_print_coupons'),
+    );
+  }
+
+  $form['view_result'] = array(
+    '#markup' => $coupon_results,
+  );
+  $form['#attached'] = array(
+    'js' => array(
+      drupal_get_path('module', 'wfm_coupons') . '/js/wfm_coupons.js',
+    ),
+  );
+  $form['#submit'] = array('wfm_coupons_print_form_submit');
+  $form['#validate'] = array('wfm_coupons_print_form_validate');
+  return $form;
+}
+
+/**
+ * Form submit callback function.
+ * @param array $form
+ *   Form renderable array.
+ * @param array $form_state
+ *   $form_state array
+ */
+function wfm_coupons_print_form_submit($form, &$form_state) {
+  $path = 'print/mycoupons/';
+  foreach ($form_state['input']['print_select'] as $coupon_nid) {
+    $path .= $coupon_nid . ',';
+  }
+  $form_state['redirect'] = trim($path, ',');
+}
+
+/**
+ * Form validation callback function. 
+ *
+ * Validates that $form_state['input']['print_select'] is an array.
+ * @param array $form
+ *   Form renderable array.
+ * @param array $form_state
+ *   $form_state array
+ */
+function wfm_coupons_print_form_validate($form, &$form_state) {
+  // If there are no coupons selected.
+  if (!is_array($form_state['input']['print_select'])) {
+    form_set_error('print_select', t('Please select coupons to print.'));
+  }
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function wfm_coupons_block_info() {
+  $blocks = array();
+  $blocks['mobile_coupon_print_form'] = array(
+    'info' => t('wfm_coupons: Coupons Mobile Print Form'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function wfm_coupons_block_view($delta = '') {
+  $block = array();
+
+  switch ($delta) {
+    case 'mobile_coupon_print_form':
+      $block['content'] = _wfm_coupons_mobile_coupons();
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Block callback function for mobile_coupon_print_form.
+ * @return string
+ *   HTML for coupons print form.
+ */
+function _wfm_coupons_build_header($storename) {
+  $heading = '';
+  if ($storenid = store_get_storenid_from_store_name($storename)){
+    $store_node = node_load($storenid);
+    if (is_object($store_node) && $store_node->type === 'store') {
+      $language = $store_node->language;
+      $store_name = filter_xss($store_node->title);
+      $store_street = filter_xss($store_node->field_postal_address[$language]['0']['thoroughfare']);
+      $heading_text = t('Coupons for') . ' ' . $store_name . ' - ' . $store_street;
+      $heading = '<h2>' . $heading_text . '</h2>';
+      drupal_set_title($heading_text, -1);
+    }
+  } 
+  return $heading;
+}
+
+function _wfm_coupons_mobile_coupons() {
+  $storename = check_plain(arg(2));
+  $storenid = store_get_storenid_from_store_name($storename);
+  if ($storenid) {
+    $form = drupal_get_form('wfm_coupons_print_form', $storenid);
+  }
+  else {
+    $form = drupal_get_form('_wfm_coupons_mobile_store_select_form');
+  }
+  return render($form);
+}
+
+/**
+ * Redirect /sales-flyer and /coupons based on ?store=XXXX query parameter.
+ */
+function _wfm_coupons_store_nid_redirect() {
+  $path = current_path();
+  $params = drupal_get_query_parameters();
+  if ($path == 'sales-flyer' || $path == 'coupons') {
+    if (isset($params['store']) && is_numeric($params['store'])) {
+      $storename = store_get_storename_from_nid($params['store']);
+      if ($storename) {
+        drupal_goto($path . '/' . $storename, array(), 301);
+      }
+    }
+  }
+}
+
+/**
+ * Mobile store selector form constructor function.
+ */
+function _wfm_coupons_mobile_store_select_form() {
+  $null = array();
+  $form = store_select_form($null, $null, array('_wfm_coupons_mobile_store_select_form_submit'));
+  $form['title'] = array(
+    '#type' => 'markup',
+    '#prefix' => '<h2 class="form-title">',
+    '#markup' => t('Sales and Coupons'),
+    '#suffix' => '</h2>',
+    '#weight' => -6
+  );
+  $form['subtitle'] = array(
+    '#type' => 'markup',
+    '#prefix' => '<h3 class="form-subtitle">',
+    '#markup' => t('Select a store to see local sales & coupons.'),
+    '#suffix' => '</h3>',
+    '#weight' => -5
+  );
+
+  return $form;
+}
+
+/**
+ * Mobile store selector submit callback.
+ */
+function _wfm_coupons_mobile_store_select_form_submit($form, &$form_state) {
+  $nid = $form_state['values']['store'];
+  if (is_numeric($nid)) {
+    $path = store_get_store_folder_by_nid($nid);
+    if ($path) {
+      $form_state['redirect'] = 'mobile/coupons/' . $path;
+    }
+  }
+}

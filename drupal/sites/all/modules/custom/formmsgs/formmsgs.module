@@ -1,0 +1,496 @@
+<?php
+
+/**
+ * @file
+ * Provides immediate, in-form validation requirements, especially to ensure
+ * that a node's author, language, taxonomy terms, or other fields are unique.
+ */
+
+/**
+ * Form message is not active.
+ */
+define('FORMMSGS_NOT_ACTIVE', 0);
+
+/**
+ * Form message is active.
+ */
+define('FORMMSGS_ACTIVE', 1);
+
+/**
+ * Implements hook_menu().
+ */
+function formmsgs_menu() {
+  $items = array();
+  $items['formmsgs/ajax'] = array(
+    'title' => 'Form messages AJAX callback',
+    'page callback' => 'formmsgs_ajax_callback_handler',
+    // As people need to be able to *edit* forms, this is a basic requirement.
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_entity_info().
+ */
+function formmsgs_entity_info() {
+  $return = array(
+    'formmsgs' => array(
+      'label' => t('Form message'),
+      'controller class' => 'EntityAPIController',
+      'entity class' => 'Formmsgs',
+      'base table' => 'formmsgs',
+//      'revision table' => 'formmsgs_revision',
+//      'uri callback' => 'formmsgs_uri',
+      'fieldable' => TRUE,
+      'exportable' => TRUE,
+      'entity keys' => array(
+        'id' => 'fmid',
+        'name' => 'name',
+//        'revision' => 'vid',
+        'label' => 'label',
+      ),
+      'access callback' => 'formmsgs_entity_access',
+      'module' => 'formmsgs',
+      'admin ui' => array(
+        'path' => 'admin/structure/formmsgs',
+        'file' => 'formmsgs.admin.inc',
+      ),
+      'bundle keys' => array(
+        'bundle' => 'name',
+      ),
+      'bundles' => array(
+        'formmsgs' => array(
+          'label' => t('Message'),
+/*
+          'admin' => array(
+            'path' => 'admin/config/user-interface/formmsgs',
+            'access arguments' => array('administer formmsgs'),
+          ),
+*/
+        ),
+      ),
+      'view modes' => array(
+        'full' => array(
+          'label' => t('On form'),
+          'custom settings' => FALSE,
+        ),
+      ),
+    ),
+  );
+  return $return;
+}
+
+/**
+ * Implements hook_help().
+ */
+function formmsgs_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#formmsgs':
+      $output = '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('The AJAX form messages module (formmsg.module) provides an API for immediate inline validation or other checking of form elements to provide a response to the user.') . '</p>';
+      return $output;
+  }
+}
+
+/**
+ * Implements hook_permission().
+ */
+function formmsgs_permission() {
+  return array(
+    'administer formmsgs' => array(
+      'title' => t('Administer AJAX form messages'),
+      'description' => t('Allows administrators to configure errors and warning messages.'),
+    ),
+    'bypass formmsgs' => array(
+      'title' => t('Bypass form message errors'),
+      'description' => t('Allows users to ignore errors set through form messages.'),
+    ),
+  );
+}
+
+/**
+ * Implements alter hook 'clientside_validation_form'.
+ *
+ * This hook is called in clientside_validation.module, line 211, in the form
+ * after build function.
+ *
+ * This implementation is modeled on that of clientside_validation_fapi.module.
+ */
+function formmsgs_clientside_validation_form_alter(&$form, &$form_state, &$js_rules) {
+  if (!isset($form['#node_edit_form']) || $form['#node_edit_form'] != TRUE) {
+    return;
+  }
+
+  // Here we gather all the information from what people have saved into the
+  // form messages data structure.
+  // See http://data.agaric.com/storage-structure-ajax-form-messages
+  // What the CSS (and JavaScript-accessible) ID becomes varies with field type:
+  // title becomes input ID edit-title
+  // field_tags becomes input ID edit-field-tags-und
+  // field_body becomes textarea ID edit-field-body-und-0-value
+  // field_image becomes edit-field-image-und-0-upload
+  // Oh.  jquery.validate.js, used by clientside_validate, uses input name.
+
+  // Gather all messages that apply to a given form.
+  // Note:  There is no difference between #form_id and #id except the former
+  // uses dashes and the latter underscores.  They can easily be converted one
+  // to the other, so the decision on which to use is purely aesthetic.  As it
+  // is easier for the end user to see the dashes version, we'll use that.
+  $formmsgs = formmsgs_form_messages($form['#id']);
+  // If we have messages for this form, we will apply them to elements.
+  if ($formmsgs) {
+    static $js_added = FALSE;
+    if (!$js_added) {
+      drupal_add_js(drupal_get_path('module', 'formmsgs') . '/formmsgs.js', array('scope' => 'footer', 'weight' => 20));
+      $js_added = TRUE;
+    }
+    // Build the form context which can be used by all created rules.
+    $form_context = array(
+      'entity_type' => $form['#entity_type'],
+      'bundle' => $form['#bundle'],
+      // Although we are partially generalized with the above options, in
+      // truth we do not know that other forms follow the same structure as
+      // node forms, so we will use 'nid' until doing general case for real.
+      'nid' => $form['nid']['#value'],
+      // Note: UID of form submitter is technically separate from node author.
+      // To do this completely faithfully, we would need to look up UID based on
+      // the author name field.
+      'uid' => $form['uid']['#value'],
+      'language' => $form['language']['#value'],
+    );
+    formmsgs_after_build_recurse($form['#id'], $form, $form_state, $js_rules, $formmsgs, $form_context);
+  }
+}
+
+/**
+ * Fill in required default values for form messages.
+ */
+function formmsgs_fill_defaults(&$formmsg) {
+  $defaults = array(
+    'form_id' => '*',
+    'default_message' => t('This requires more attention and will likely trigger a validation error as-is.'),
+  );
+  $formmsg += $defaults;
+}
+
+/**
+ * Runs rule creation for elements, recursing through form layers as needed.
+ */
+function formmsgs_after_build_recurse($form_id, &$form, &$form_state, &$js_rules, &$formmsgs, &$form_context) {
+  if ($children = array_values(element_children($form))) {
+    foreach ($children as $index => $item) {
+      $element = &$form[$item];
+      // The types of fields we can potentially deal with.  Sanity check
+      // prevents trying to do things on value and hidden fields, let alone on
+      // attribute strings like #build_id.
+      // Currently we do not look at file or password fields.
+      // We can either defive a hook allowing formmsgs modules to declare
+      // support for further field types, or just be very open to patches
+      // adding new ones.
+      $types = array(
+        'textfield', 'textarea', 'select', 'radio', 'checkbox', 'radios', 'checkboxes',
+      );
+      if (isset($element['#type']) && in_array($element['#type'], $types)) {
+        formmsgs_create_rules($form_id, $element, $js_rules, $formmsgs, $form_context);
+      }
+      formmsgs_after_build_recurse($form_id, $element, $form_state, $js_rules, $formmsgs, $form_context);
+    }
+  }
+}
+
+/**
+ * Use our form messages instruction data to form rules for affected elements.
+ *
+ * Cognate functions are named '_regular' in clientside_validation_form.module
+ * and eponymously in in modules such as clientside_validation_html5.
+ *
+ * Only $js_rules is meant to be changed; $element, $formmsgs, and $form_context
+ * are passed by reference for the sake of efficiency.
+ */
+function formmsgs_create_rules($form_id, &$element, &$js_rules, &$formmsgs, &$form_context) {
+  $element_name = $element['#name'];
+  $comparison_name = isset($element['#field_name']) ? $element['#field_name'] : $element_name;
+  foreach ($formmsgs as $formmsg) {
+    $name = $formmsg['element_name'];
+    if ($comparison_name == $name) {
+      $context = array(
+        'callback' => $formmsg['callback'],
+        'field_name' => $name,
+        'element_name' => $element['#name'],
+      ) + $form_context;
+      $method = isset($formmsg['method']) ? $formmsg['method'] : 'ajaxFormMessage';
+      $js_rules[$name][$method] = $context;
+      // Setting the default message in a way that works to set it at all:
+      // $js_rules[$name]['messages'][$method] = $formmsg['default_message'];
+      // Has the unfortunate side effect of preventing on-the-fly messages
+      // from overriding it.  The method below, taken from clientside_validation
+      // and its use of AJAX for FAPI validation is harmless-- and ineffectual.
+      $js_rules[$name][$method]['messages'][] = $formmsg['default_message'];
+    }
+  }
+}
+
+/**
+ * Gathers all form messages applicable to a provided form ID.
+ */
+function formmsgs_form_messages($form_id = NULL) {
+  $formmsgs = module_invoke_all('formmsgs_form_messages');
+  // If no form ID is provided, return all form message definitions.
+  if (!is_null($form_id)) {
+    // Remove form message definitions that do not apply to a given form ID.
+    foreach ($formmsgs as $key => $formmsg) {
+      // Remove the form message definitions that did not match.
+      if (!formmsgs_has_form_id($formmsg['form_id'], $form_id)) {
+        unset ($formmsgs[$key]);
+      }
+    }
+  }
+  foreach (array_keys($formmsgs) as $key) {
+    formmsgs_fill_defaults($formmsgs[$key]);
+  }
+  return $formmsgs;
+}
+
+/**
+ * Check if a form message definition applies for a given form.
+ *
+ * @param $ids
+ *   An array of form IDs (or optionally a string of one ID), each accepting an
+ *   asterisk (*) as a wildcard for the beginning or end of a form ID.
+ *
+ * @param $form_id
+ *   A string representing the current form ID (dashes version).
+ *
+ * @return boolean
+ *  TRUE if the potential forms for the message match the current form ID.
+ *  FALSE if no match.
+ */
+function formmsgs_has_form_id($ids, $form_id) {
+  // Help out people who have put in a single form ID rather than an array.
+  if (is_string($ids)) {
+    $ids = array($ids);
+  }
+  // Each message can provide an array of IDs, we have to go through them.
+  foreach ($ids as $id) {
+    // If the ID is a wildcard or matches the form ID exactly, we match.
+    if ($id === '*' || $id === $form_id) {
+      return TRUE;
+    }
+    // If we have an ID with a wildcard in it, check for starting/ending match.
+    elseif ($pos = strpos($id, '*') !== FALSE) {
+      // If position is positive, we may have a starting match.
+      if ($pos && substr($form_id, 0, $pos) === substr($id, 0, $pos)) {
+        return TRUE;
+      }
+      // Else position is zero, and we may have an ending match.
+      $pattern = substr($id, 1);
+      $pos = count($pattern) * -1;
+      if ($pattern === substr($form_id, $pos)) {
+        return TRUE;
+      }
+    }
+  }
+  // The potential forms for this message do not match the given form ID.
+  return FALSE;
+}
+
+/**
+ * Callback handler for AJAX requests.
+ *
+ * Page callback to receive the AJAX call and direct it to the callback defined
+ * by the form message definition (and passed in as the first parameter).
+ */
+function formmsgs_ajax_callback_handler($callback, $extra = NULL) {
+  $value = $_POST['value'];
+  $context = $_POST['param'];
+
+  $callback($value, $context, $extra);
+}
+
+/**
+ * Test callback.
+ */
+function formmsgs_image_style_name($form, $form_state) {
+  image_style_name_validate($form['name']);
+  $message = form_get_error($form['name']);
+  if (!$message) {
+    $message = "Default message.";
+  }
+  $commands = array();
+  $commands[] = ajax_command_html('#formmsgs-image-style-name', $message);
+  return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+/**
+ * Access callback for Entity API-provided formmsgs administration section.
+ *
+ * @TODO Patch Entity API to accept hook_menu style 'access arguments' to
+ * make this unnecessary, at least for the straight user_access() case.
+ */
+function formmsgs_entity_access($op, $entity = NULL, $account = NULL) {
+  return user_access('administer formmsgs', $account);
+}
+
+/**
+ * Fetches an array of all form messages, keyed by the formmsg machine name.
+ *
+ * Also used to check if machine name is used for an existing form message.
+ *
+ * @param $name
+ *   If set, the form message with the given name is returned.
+ * @return $formmsgs
+ *   An array of form messages or, if $name is set, a single one.
+ */
+function formmsgs_load_by_name($name = NULL) {
+  // @TODO Modeled on profile2_get_types, but shouldn't this use the
+  // formmsgs_load_multiple() wrapper.  It wouldn't gain anything, true...
+  $formmsgs = entity_load('formmsgs', isset($name) ? array($name) : FALSE);
+  return isset($name) ? reset($formmsgs) : $formmsgs;
+}
+
+/**
+ * Fetch a form message object.
+ *
+ * @param $fmid
+ *   Integer specifying the form message id.
+ * @param $reset
+ *   A boolean indicating that the internal cache should be reset.
+ * @return
+ *   A fully-loaded $formmsg object or FALSE if it cannot be loaded.
+ *
+ * @see formmsgs_load_multiple()
+ */
+function formmsgs_load($fmid, $reset = FALSE) {
+  $formmsg = formmsgs_load_multiple(array($fmid), array(), $reset);
+  return reset($formmsg);
+}
+
+/**
+ * Load multiple profiles based on certain conditions.
+ *
+ * @param $fmids
+ *   An array of form message IDs.
+ * @param $conditions
+ *   An array of conditions to match against the {formmsgs} table.
+ * @param $reset
+ *   A boolean indicating that the internal cache should be reset.
+ * @return
+ *   An array of form message objects, indexed by fmid.
+ *
+ * @see entity_load()
+ * @see formmsgs_load()
+ */
+function formmsgs_load_multiple($fmids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('formmsgs', $fmids, $conditions, $reset);
+}
+
+/**
+ * Load the configured inline checks and messages for a form.
+ */
+function formmsgs_load_by_form($form_id) {
+  $formmsgs = array();
+  // @TODO probably add caching here.
+  $formmsgs = module_invoke_all('formmsgs', $form_id);
+  // the form element to attach to
+  // the function to call
+  // whether to also make this function a validation function
+  // when to call the function (per character or when the form is moved away from)?
+  return $formmsgs;
+}
+
+/**
+ * Create a new profile object.
+function formmsgs_create(array $values) {
+  return new Formmsgs($values);
+}
+ */
+
+/**
+ * The class used for form message entities.
+ */
+class Formmsgs extends Entity {
+
+  public $label;
+  public $status;
+
+  public function __construct($values = array()) {
+    parent::__construct($values, 'formmsgs');
+  }
+}
+
+/**
+ * Implements hook_modules_enabled().
+ *
+ * We want to instantiate module-provided fields only once.
+function formmsgs_modules_enabled() {
+  $elements = module_invoke($module, 'formmsgs_elements');
+  foreach ($elements as $element) {
+    formmsgs_element_save($element);
+  }
+}
+ */
+
+/**
+ * Save an element as a new field (or update an existing field).
+ *
+ * Based on http://api.drupal.org/api/function/field_test_entity_save/7
+function formmsgs_element_save(&$element) {
+  // @TODO maybe: node_save has transaction, try/catch error handling.
+
+  field_attach_presave('test_entity', $element);
+
+  if (!isset($element->is_new)) {
+    $element->is_new = empty($element->eid);
+  }
+
+  if (!$element->is_new && !empty($element->revision)) {
+    $element->old_evid = $element->evid;
+    unset($element->evid);
+  }
+
+  $update_element_evid = TRUE;
+  if ($element->is_new) {
+    drupal_write_record('formmsgs_element', $element);
+    drupal_write_record('formmsgs_element_revision', $element);
+    $op = 'insert';
+  }
+  else {
+    drupal_write_record('formmsgs_element', $element, 'eid');
+    if (!empty($element->revision)) {
+      drupal_write_record('formmsgs_element_revision', $element);
+    }
+    else {
+      drupal_write_record('formmsgs_element_revision', $element, 'evid');
+      // No need to update the elements version ID; it has not changed.
+      $update_element_evid = FALSE;
+    }
+    $op = 'update';
+  }
+  if ($update_element_evid) {
+    db_update('formmsgs_element')
+      ->fields(array('evid' => $entity->evid))
+      ->condition('evid'
+
+  // Save fields.
+  $function = "field_attach_$op";
+  $function('formmsgs_element', $element);
+
+  module_invoke_all('entity_' . $op, $element, 'formmsgs_element');
+}
+ */
+
+
+ /**
+  * Utility function currently used by formmsgsuniquefield to give consistent element_name
+  * given a field name
+  */
+ function formmsgs_rationalize_field_name($field) {
+    switch ($field) {
+      case 'there_are_no_special_cases_fool':
+        return 'oop_was_wrong';
+      default:
+        return $field;
+    }
+  }

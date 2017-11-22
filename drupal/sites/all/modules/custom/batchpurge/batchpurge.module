@@ -24,12 +24,13 @@ function batchpurge_menu() {
 function _batchpurge2() {
   $batch = array(
     'title' => t('Purging Users'),
-    'init_message' => t('Purging users is starting.'),
+    'init_message' => t('Purging invalid users.'),
+    'progress_message' => t('zzProcessed @current out of @total.'),
     'operations' => array(
-      array('_batchpurge2_callback', array()),
+      array('_batchpurge2_op', array()),
     ),
     'finished' => '_batchpurge2_finished_callback',
-//    'file' => 'batchpurge/batchpurge.module',
+    'error_message' => t('Example Batch has encountered an error.'),
     'file' => drupal_get_path('module','batchpurge') . '/batchpurge.module',
   );
   batch_set($batch);
@@ -41,35 +42,52 @@ function _batchpurge2() {
 /**
  * Callback for _batchpurge2 using Batch API to purge users
  *
+ * Each batch operation callback will iterate over and over until
+ * $context['finished'] is set to 1. After each pass, batch.inc will
+ * check its timer and see if it is time for a new http request,
+ * i.e. when more than 1 minute has elapsed since the last request.
+ * Note that $context['finished'] is set to 1 on entry - a single pass
+ * operation is assumed by default.
+ *
  * @return string
  */
-function _batchpurge2_callback(&$context) {
+function _batchpurge2_op(&$context) {
+  //First time in - setup some variables.
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
-    $context['sandbox']['current_uid'] = 0;
-//    $context['sandbox']['max'] = db_query("SELECT COUNT(*) FROM {users} where mail like '%@d7_test1.local.invalid%'")->fetchField();
+    $context['sandbox']['current'] = 0;
+    $context['sandbox']['total'] = db_query("SELECT COUNT(*) FROM {users} where mail like '%@d7_test1.local.invalid%'")->fetchField();
   }
-  $limit = 5;
+
+  //Each time in, grab 10 users and process them.
+  $batch_size = 10;
   $query = db_select('users','u');
   $query->fields('u',array('uid','name','mail'));
 //  $query->condition('mail','%'. db_like('@localhost') . '%','LIKE');
   $query->condition('mail','%'. db_like('@d7_test1.local.invalid') . '%','LIKE');
+  $query->range(0,$batch_size);
   $query->orderBy('uid');
   $results = $query->execute();
 
-  $context['sandbox']['max'] = $results->rowCount();
+//  $context['sandbox']['max'] = $results->rowCount();
   foreach ($results as $row) {
     $user = user_load($row->uid);
-    usleep(250000);
+    usleep(150000);
 //    user_delete($row->uid);
 
+    //Will be passed into the finished_callback.
     $context['results'][] = $row->uid . ' : ' . check_plain($row->mail);
+
+    $context['current'] ++;
+
+
     $context['sandbox']['progress']++;
-    $context['sandbox']['current_uid'] = $row->uid;
-    $context['message'] = "Processing: " . check_plain($row->mail);
+//    $context['message'] = "Processing: " . check_plain($row->mail);
+    $context['message'] = t('Now processing %mail ',array('%mail' => check_plain($row->mail)));
   }
-  if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
-    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  //Not finished yet - estimate completion level.
+  if ($context['sandbox']['progress'] != $context['sandbox']['total']) {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['total'];
   }
 
 //  return 'Hello from batch purge!';
@@ -79,16 +97,18 @@ function _batchpurge2_finished_callback($success, $results, $operations) {
   // The 'success' parameter means no fatal PHP errors were detected. All
   // other error management should be handled using 'results'.
   if ($success) {
-    $message = format_plural(count($results), 'One user processed.', '@count users processed.');
+    $message = format_plural(count($results), 'One user processed.', '@count users purged.');
   }
   else {
     $message = t('Finished with an error.');
   }
   drupal_set_message($message);
+
   // Providing data for the redirected page is done through $_SESSION.
   foreach ($results as $result) {
     $items[] = t('Process %title.', array('%title' => $result));
   }
+
   $_SESSION['my_batch_results'] = $items;
 }
 

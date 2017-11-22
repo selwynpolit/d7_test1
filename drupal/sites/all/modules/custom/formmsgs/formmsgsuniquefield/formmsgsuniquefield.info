@@ -1,0 +1,14 @@
+name = AJAX Form Messages Unique Field
+
+description = "[formmsgsuniquefield] Provides inline validation that a node's author, language, taxonomy terms, or other fields are unique."
+package = AJAX form messages
+core = 7.x
+dependencies[] = formmsgs
+dependencies[] = unique_field
+
+; Information added by drupal.org packaging script on 2013-09-30
+version = "7.x-1.x-dev"
+core = "7.x"
+project = "formmsgs"
+datestamp = "1380580022"
+

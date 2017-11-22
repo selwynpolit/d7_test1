@@ -1,0 +1,13 @@
+name = AJAX form messages API
+description = "[formmsgs] Provides immediate, in-form notice of validation requirements."
+package = AJAX form messages
+core = 7.x
+dependencies[] = entity
+files[] = tests/formmsgs.test
+
+; Information added by drupal.org packaging script on 2013-09-30
+version = "7.x-1.x-dev"
+core = "7.x"
+project = "formmsgs"
+datestamp = "1380580022"
+

@@ -29,6 +29,17 @@ function search_api_nan_entity_info() {
       'menu wildcard' => '%nanentity',
       'file' => 'search_api_nan.admin.inc',
     ),
+    'bundles' => array(
+      'search_api_nan' => array(
+        'label' => t('Search API Nan'),
+        'admin' => array(
+          'path' => 'admin/config/search/search-api-nans',
+//          'path' => 'admin/naans',
+//          'access arguments' => array('administer nans'),
+          'access arguments' => true,
+        ),
+      ),
+    ),
 //    'views controller class' => 'EntityDefaultViewsController',
   );
 

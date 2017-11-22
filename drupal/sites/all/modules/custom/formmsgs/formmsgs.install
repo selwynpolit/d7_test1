@@ -1,0 +1,155 @@
+<?php
+
+/**
+ * @file
+ * DB schema, install, and uninstall functions for AJAX Form Messages.
+ *
+ * The entity base table and revision table schema are defined here.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function formmsgs_schema() {
+  $schema = array();
+  $schema['formmsgs'] = array(
+    'description' => 'Stores information about all formmsg entities.',
+    'fields' => array(
+      'fmid' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique form message ID.',
+      ),
+/*
+      'vid' => array(
+        'description' => 'The current {formmsgs}.vid version identifier.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+*/
+      'name' => array(
+        'description' => 'The machine-readable name of the form message.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'description' => 'The human-readable name of this form message.',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'status' => array(
+        'description' => 'Boolean indicating whether the form message is active.',
+        'type' => 'int', // taken from node.install, why is this not tinyint?
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 1,
+      ),
+    ) + entity_exportable_schema_fields(),
+    'primary key' => array('fmid'),
+    'unique keys' => array(
+      'name' => array('name'),
+    ),
+/*
+    'foreign keys' => array(
+      'formmsgs_revision' => array(
+        'table' => 'formmsgs_revision',
+        'columns' => array('vid' => 'vid'),
+      ),
+    ),
+*/
+  );
+/*
+  $schema['formmsgs_revision'] = array(
+    'description' => 'Stores information about each saved version of a {formmsgs}.',
+    'fields' => array(
+      'fmid' => array(
+        'description' => 'The {formmsgs} this revision belongs to.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'vid' => array(
+        'description' => 'The primary identifier for this revision.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'description' => 'The human-readable name of this form message at this version.',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'status' => array(
+        'description' => 'Boolean indicating whether the form message is active at this revision.',
+        'type' => 'int', // taken from node.install, why is this not tinyint?
+        'not null' => TRUE,
+        'default' => 1,
+      ),
+      'timestamp' => array(
+        'description' => 'A Unix timestamp indicating when this version was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that created this version.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'indexes' => array(
+      'fmid' => array('fmid'),
+      'uid' => array('uid'),
+    ),
+    'primary key' => array('vid'),
+    'foreign keys' => array(
+      'versioned_formmsg' => array(
+        'table' => 'formmsgs',
+        'columns' => array('fmid' => 'fmid'),
+      ),
+      'version_author' => array(
+        'table' => 'users',
+        'columns' => array('uid' => 'uid'),
+      ),
+    ),
+  );
+*/
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function formmsgs_install() {
+  // Define a field.
+  $field = array(
+    'field_name' => 'field_message',
+    'type' => 'text_long',
+    'entity_types' => array('formmsgs'),
+    'translatable' => TRUE,
+  );
+  $field = field_create_field($field);
+
+  // Attach a field.
+  $instance = array(
+    'field_name' => 'field_message',
+    'entity_type' => 'formmsgs',
+    'label' => t('Message'),
+    'bundle' => 'formmsgs',
+    'description' => t('Message to show on error.'),
+    'widget' => array(
+      'type' => 'text_textarea',
+      'weight' => -5,
+    ),
+  );
+  field_create_instance($instance);
+}

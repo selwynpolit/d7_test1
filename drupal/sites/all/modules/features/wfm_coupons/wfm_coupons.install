@@ -1,0 +1,265 @@
+<?php
+/**
+ * @file
+ * WFM Coupons feature updates.
+ * Update hooks - enable modules, etc.
+ */
+
+/**
+ * Implements hook_update_n()
+ * Creates /coupons landing page node.
+ */
+function wfm_coupons_update_7001() {
+  $content = '<h2>Select a Store to see Local Coupons</h2>
+[api:block["wfm_blocks", "wfm_blocks_coupon_filters"]/]';
+  $lang = LANGUAGE_NONE;
+
+  $node = new stdClass();
+  $node->title = 'Coupons';
+  $node->type = 'page';
+
+  node_object_prepare($node); // Sets some defaults. Invokes hook_prepare() and hook_node_prepare().
+
+  $node->language = $lang; // Or e.g. 'en' if locale is enabled
+  $node->uid = 4; 
+  $node->status = 1; //(1 or 0): published or not
+  $node->promote = 0; //(1 or 0): promoted to front page
+  $node->comment = 0; // 0 = comments disabled, 1 = read only, 2 = read/write
+
+  $node->body[$lang][0]['value'] = $content;
+  $node->body[$lang][0]['format'] = 'full_html';
+  $node->field_page_heading_layout[$lang][0]['value'] = 'none';
+  $node->field_field_page_body_layout[$lang][0]['value'] = 'copy'; 
+
+  $node = node_submit($node); // Prepare node for saving
+  node_save($node);
+}
+
+/**
+ * Enable wfm_template_text module.
+ */
+function wfm_coupons_update_7002() {
+  module_enable(array('wfm_template_text'));
+
+  $settings = array(
+    'wfm_template_text_coupons_check_coupon' => 'Print coupon',
+    'wfm_template_text_coupons_no_results' => array(
+      'value' => '<p>Sorry, there are no coupons available for the selected store.</p>',
+      'format' => 'full_html',
+    ),
+    'wfm_template_text_coupons_print_coupons' => 'Print Selected',
+    'wfm_template_text_coupons_select_all' => 'Select all coupons',
+    'wfm_template_text_sales_coupons_coupons_tab_label' => 'Coupons',
+    'wfm_template_text_sales_coupons_disclaimer' => array(
+      'value' => '<p>Prices valid while promotional supplies last. Quantities may be limited. Some products may not be available at all markets. Regular prices may vary. We reserve the right to correct errors.</p>',
+      'format' => 'full_html',
+    ),
+    'wfm_template_text_sales_coupons_pdf_download_text' => 'Download Sales Flyer as PDF',
+    'wfm_template_text_sales_coupons_sales_tab_label' => 'Sales',
+    'wfm_template_text_sales_coupons_store_search_label' => 'Sales & Coupons at:',
+    'wfm_template_text_sales_coupons_store_select_submit' => 'View Sales & Coupons',
+    'wfm_template_text_no_store_selected' => array(
+      'value' => '<p class="no-store-selected">To see sale items and coupons for your store, please select your store from the menu.</p>',
+      'format' => 'full_html',
+    ),
+    'wfm_template_text_sales_no_results' => array(
+      'value' => '<p>This store does not have its sales flyer online, but rest assured, there are more than 1,000 items on sale in every Whole Foods Market<sup>®</sup>.</p>
+<p>Also, make sure to check out these <a href="?qt-custom_quicktab_sales_coupons=1#qt-custom_quicktab_sales_coupons">local coupons</a>.</p>',
+      'format' => 'full_html',
+    ),
+  );
+  foreach ($settings as $key => $setting) {
+    variable_set($key, $setting);
+  }
+}
+
+/**
+ * Create Sales/Coupons header block in DB.
+ * @see block_add_block_form_submit()
+ */
+function wfm_coupons_update_7003() {
+  $content = '<div id="sales-coupons-header">
+  <div class="text-wrap">
+    <h2>Sales and Coupons</h2>
+    <p class="subtitle">Get more of the good stuff for less than you think.</p>
+    [api:sales_coupons_no_store_selected/]
+  </div><!-- .text-wrap -->
+  [api:block["wfm_blocks", "wfm_blocks_coupon_filters"]/]
+  </div><!-- #sales-coupons-header -->';
+
+  $block = array(
+    'title' => '',
+    'info' => 'Sales and Coupons Header11',
+    'visibility' => 1,
+    'pages' => 'coupons*' . "\n" . 'sales-flyer*',
+    'custom' => 0,
+    'module' => 'block',
+    'regions' => array(
+       'wholefoods' => 'content',
+    ),
+    'body' => array(
+      'value' => $content,
+      'format' => 'full_html',
+    ),
+    'roles' => array(FALSE),
+  );
+
+  // Insert block and save delta
+  $block['delta'] = db_insert('block_custom')
+    ->fields(array(
+      'body' => $block['body']['value'],
+      'info' => $block['info'],
+      'format' => $block['body']['format'],
+    ))
+    ->execute();
+
+  $query = db_insert('block')->fields(
+    array(
+      'visibility',
+      'pages',
+      'custom',
+      'title',
+      'module',
+      'theme',
+      'status',
+      'weight',
+      'delta',
+      'cache'
+    )
+  );
+
+  $query->values(
+    array(
+      'visibility' => (int) $block['visibility'],
+      'pages' => trim($block['pages']),
+      'custom' => (int) $block['custom'],
+      'title' => $block['title'],
+      'module' => $block['module'],
+      'theme' => 'wholefoods',
+      'status' => 0,
+      'weight' => 0,
+      'delta' => $block['delta'],
+      'cache' => DRUPAL_NO_CACHE,
+    )
+  );
+  $query->execute();
+
+  $query = db_insert('block_role')->fields(array('rid', 'module', 'delta'));
+  foreach (array_filter($block['roles']) as $rid) {
+    $query->values(array(
+      'rid' => $rid,
+      'module' => $block['module'],
+      'delta' => $block['delta'],
+    ));
+  }
+  $query->execute();
+
+  foreach ($block['regions'] as $theme => $region) {
+    db_merge('block')
+      ->key(array('theme' => $theme, 'delta' => $block['delta'], 'module' => $block['module']))
+      ->fields(array(
+        'region' => ($region == BLOCK_REGION_NONE ? '' : $region),
+        'pages' => trim($block['pages']),
+        'status' => (int) ($region != BLOCK_REGION_NONE),
+      ))
+      ->execute();
+  }
+
+  drupal_set_message(t('The Sales and Coupons Header block has been created.'));
+}
+
+/**
+ * Delete existing /coupons and /sales-flyers nodes.
+ */
+function wfm_coupons_update_7004() {
+  $nodes = array(
+    3512266,
+    18550
+  );
+  node_delete_multiple($nodes);
+}
+
+/**
+ * Change sidebar block page settings.
+ */
+function wfm_coupons_update_7005() {
+  $pages = 'about-our-products/whole-deal' . "\n" .
+    'about-our-products/whole-deal/sure-deals' . "\n" .
+    'about-our-products/whole-deal/budget-recipes' . "\n" .
+    'about-our-products/whole-deal/meal-planner' . "\n" .
+    'about-our-products/whole-deal/money-saving-tips' . "\n" .
+    'take-value-tour' . "\n" .
+    'homemade-valentines-day' . "\n" .
+    'allcoupons';
+
+  $query = db_update('block')
+    ->fields(array('pages' => $pages))
+    ->condition('theme', 'wholefoods', '=')
+    ->condition('delta', 15, '=')
+    ->execute();
+
+  if ($query) {
+    drupal_set_message(t('Whole Deal Sidebar removed.'));
+  }
+}
+
+/**
+ * Add "On Sale" to the header menu.
+ */
+function wfm_coupons_update_7006() {
+  $menu_items = array(
+    'main_menu' => array (
+      'link_path' => 'sales-flyer',
+      'link_title' => 'On Sale',
+      'menu_name' => 'user-menu',
+      'weight' => '-49'
+    ),
+    'brand_camp_menu' => array(
+      'link_path' => 'sales-flyer',
+      'link_title' => 'On Sale',
+      'menu_name' => 'menu-brand-camp-top',
+      'weight' => '-49'
+    )
+  );
+
+  foreach ($menu_items as $menu_item) {
+    menu_link_save($menu_item);
+  }
+  cache_clear_all('*', 'cache_menu', TRUE);
+}
+
+/**
+ * Remove legal disclaimer template text.
+ */
+function wfm_coupons_update_7007() {
+  variable_del('wfm_template_text_sales_coupons_disclaimer');
+}
+
+/**
+ * Update coupon expiration dates.
+ */
+function wfm_coupons_update_7008() {
+  db_update('field_data_field_coupon_expiration')
+    ->fields(array('field_coupon_expiration_value' => '2016-07-31 00:00:00'))
+    ->condition('field_coupon_expiration_value', '2016-07-30 19:00:00')
+    ->execute();
+
+  db_update('field_data_field_coupon_expiration')
+    ->fields(array('field_coupon_expiration_value' => '2016-09-30 00:00:00'))
+    ->condition('field_coupon_expiration_value', '2016-09-29 19:00:00')
+    ->execute();
+
+  db_update('field_data_field_coupon_expiration')
+    ->fields(array('field_coupon_expiration_value' => '2016-12-01 00:00:00'))
+    ->condition('field_coupon_expiration_value', '2016-11-30 06:00:00')
+    ->execute();
+
+  return 'Updated coupon expiration dates.';
+}
+
+/**
+ * Change base url of sales flyer pdf.
+ */
+function wfm_coupons_update_7009() {
+  variable_set('wfm_variable__specials_pdf_url', 'assets.wholefoodsmarket.com/storespecials/');
+}

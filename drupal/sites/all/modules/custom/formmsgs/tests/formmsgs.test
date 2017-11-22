@@ -1,0 +1,46 @@
+<?php
+
+class FormmsgsUnitTestCase extends DrupalUnitTestCase {
+
+  public static function getInfo() {
+    return array(
+      'name' => 'AJAX Form Messages unit tests',
+      'description' => 'Test that low-level functions in formmsgs.module work correctly.',
+      'group' => 'AJAX Form Messages',
+    );
+  }
+
+  function testFormMessageIdParse() {
+
+    $result = formmsgs_has_form_id('test-example', 'test-example');
+    $msg = t('Identical form IDs shall return TRUE.');
+    $this->assertTrue($result, $msg);
+
+    $result = formmsgs_has_form_id('*', 'test-example');
+    $msg = t('A wildcard alone shall return TRUE.');
+    $this->assertTrue($result, $msg);
+
+    $form_ids = array('not-a-match', 'test-example', 'another-non-match');
+    $result = formmsgs_has_form_id($form_ids, 'test-example');
+    $msg = t('An identical form ID in an array with non-matching form IDs shall return TRUE.');
+    $this->assertTrue($result, $msg);
+
+    $form_ids = array('not-a-match', 'test-example-not-match', '*-not-match', 'not-match-*', 'test-*-example', 'another-non-match', '*-example-not-match', 'not-test*');
+    $result = formmsgs_has_form_id($form_ids, 'test-example');
+    $msg = t('An array of form IDs with no match shall return FALSE.');
+    $this->assertFalse($result, $msg);
+
+    $result = formmsgs_has_form_id($form_ids, '*-example-too-far');
+    $msg = t('A form ID that has a wildcard to the left (at the beginning) but ends differently (not an exact right-match) shall return FALSE.');
+    $this->assertFalse($result, $msg);
+
+    $result = formmsgs_has_form_id($form_ids, '*-example');
+    $msg = t('A form ID that has a right-match and a wildcard at the left shall return TRUE.');
+    $this->assertTrue($result, $msg);
+
+    $form_ids = array('not-a-match', 'test-*', 'another-non-match');
+    $result = formmsgs_has_form_id($form_ids, 'test-example');
+    $msg = t('A form ID (in an array with non-matching) that has a left-match and a wildcard at the right shall return TRUE.');
+    $this->assertTrue($result, $msg);
+  }
+}

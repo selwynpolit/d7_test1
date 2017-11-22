@@ -1,0 +1,71 @@
+p {
+    margin: 0;
+    padding: 0;
+}
+.view-content {
+    padding: 0 0 20px;
+}
+.views-row {
+    width: 325px;
+    float: left;
+    margin-right: 20px;
+    margin-top: 20px;
+    text-align: center;
+    position: relative;
+    font-size: 12px;
+    display: block;
+}
+
+.coupon-individual-print-view {
+    border: 2px dashed black;
+    overflow: hidden;
+    padding: 5px 10px 10px;
+    height: 215px;
+    max-height: 215px;
+}
+.cut {
+    position: absolute;
+    top: -13px;
+    left: 6px;
+}
+.view-content {
+    position: relative;
+    padding: 20px 0;
+}
+.view-content:after, .clearfix:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+.wfmcouponlogo {
+    float: left;
+    padding-right: 10px;
+}
+.short-redemption-info {
+    margin: 3px 0 5px 0;
+}
+.offer {
+    font-size: 25px;
+    clear: left;
+    text-align: center;
+}
+.headline {
+    font-size: 10px;
+    margin-top: 1px;
+    text-align: center;
+    line-height: 100%;
+}
+.long-redemption-info {
+    font-size: 8px;
+}
+.expires, .product {
+    float: right;
+}
+.barcode {
+    float: left;
+    position:relative;
+    top: -20px;
+}
+.plu, .plu-expires {
+    float: left;
+}

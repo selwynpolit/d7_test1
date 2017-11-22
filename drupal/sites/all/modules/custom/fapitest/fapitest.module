@@ -1,0 +1,124 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: Selwyn Polit
+ * Date: 3/10/15
+ * Time: 10:50 AM
+ */
+
+
+/**
+ * Implements hook_menu().
+ **/
+function fapitest_menu() {
+  //$items = array();
+
+//  $items['fapitest'] = array(
+//    'title' => 'FAPI Test',
+//    'type' => MENU_NORMAL_ITEM,
+//    'page callback' => 'fapitest',
+//    'access callback' => TRUE,
+//  );
+
+  $items['fapitest'] = array(
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('fapitest_form'),
+    'title' => 'FAPI Test',
+    'type' => MENU_NORMAL_ITEM,
+    'access callback' => TRUE,
+  );
+
+  return $items;
+}
+
+/**
+ * test code
+ * @return string
+ */
+function fapitest_form() {
+  $form = array();
+  $form['personal_info']['birthday']['core|birth_month'] = array(
+    '#type' => 'select',
+    '#options' => array(
+      0 => t('Month'),
+      '01' => t('January'),
+      '02' => t('February'),
+      '03' => t('March'),
+      '04' => t('April'),
+      '05' => t('May'),
+      '06' => t('June'),
+      '07' => t('July'),
+      '08' => t('August'),
+      '09' => t('September'),
+      '10' => t('October'),
+      '11' => t('November'),
+      '12' => t('December')
+    ),
+    '#default_value' => "06",
+    '#disabled' => false,
+  );
+
+  $form['personal_info']['birthday']['core|birth_day'] = array(
+    '#type' => 'select',
+    '#options' => newsletters_get_numeric_options(1, 31, 'Day'),
+    '#default_value' => newsletters_convert_int_to_upm_strings("26"),
+    '#disabled' => false,
+  );
+
+  $form['#submit'] = array('fapitest_submit');
+  return $form;
+
+//  drupal_set_title(t('Email Preference Center'));
+//  $form = drupal_get_form($form);
+//  return array(
+//    'header' => array(
+//      '#type' => 'markup',
+//      '#markup' => newsletters_preferences_header_callback($upm_profile['core']),
+//    ),
+//    'form' => array(
+//      '#type' => 'markup',
+//      '#markup' => drupal_render($form),
+//    ),
+//  );
+
+}
+
+function fapitest_submit($form, &$form_state) {
+  drupal_set_message("submitted") ;
+}
+
+function newsletters_get_numeric_options($bottom, $top, $default_text = '') {
+  $options = array();
+  $i = 0;
+
+  if ($default_text) {
+    $options[0] = t($default_text);
+  }
+
+  while ($i <= $top) {
+    if ($i >= $bottom) {
+      $key = strval($i);
+      if (strlen($key) < 2) {
+        $key = '0' . $key;
+      }
+      $options[$key] = $i;
+    }
+    $i++;
+  }
+
+  return $options;
+}
+
+
+/**
+ * Convert integers into at least two-character string. 1 becomes '01', for example.
+ * @param int $int Number to convert.
+ * @return string Number converted to string.
+ */
+function newsletters_convert_int_to_upm_strings($int) {
+  $out = check_plain(strval($int));
+  if (strlen($out) < 2) {
+    $out = '0' . $out;
+  }
+  return $out;
+}

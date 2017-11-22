@@ -1,0 +1,30 @@
+<?php
+
+/**
+ * Implements hook_formmsgs().
+ *
+ * NOTE: There will probably be at least a couple layers of indirection around
+ * this eventually, to allow for module-provided and UI-provided form messages
+ * to mix harmoniously, but we're just getting things started.
+ */
+function formmsgsnag_formmsgs($form_id) {
+
+}
+
+/**
+ * Implements hook_clientside_validation_rule_alter().
+ *
+ * See http://drupal.org/node/1324788
+ */
+function formmsgsnag_clientside_validation_rule_alter(&$js_rules, $element, $context) {
+debug('anything?');
+debug($context, 'context');
+debug($js_rules, 'js_rules');
+  switch ($context['type']) {
+    case 'fapi':
+      if ($context['rule']['callback'] == '?') {
+        // Do something.
+      }
+      break;
+  }
+}

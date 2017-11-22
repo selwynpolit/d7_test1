@@ -1,0 +1,6 @@
+name = Lawmakers
+description = "Lawmaker Entity"
+core = 7.x
+package = Lawmakers
+
+dependencies[] = entity

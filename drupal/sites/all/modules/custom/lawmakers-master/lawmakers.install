@@ -1,0 +1,238 @@
+<?php
+/**
+ * @file
+ * Install, update, and uninstall functions for lawmakers
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function lawmakers_schema() {
+  $schema = array();
+
+  $schema['lawmakers'] = array(
+    'description' => 'Lawmakers table for Entity',
+    'fields' => array(
+      'lawmakers_id' => array(
+        'description' => 'Primary Key lawmaker_id',
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+      'username' => array(
+        'description' => 'Auto Generated Custom Username',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'title' => array(
+        'description' => 'Lawmaker title Rep or Sen',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'firstname' => array(
+        'description' => 'Firstname',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'middlename' => array(
+        'description' => 'Middle initial',
+        'type' => 'varchar',
+        'length' => '255',
+        'default' => '',
+      ),
+      'lastname' => array(
+        'description' => 'Lastname',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'name_suffix' => array(
+        'description' => 'Name Suffix',
+        'type' => 'varchar',
+        'length' => '255',
+        'default' => '',
+      ),
+      'nickname' => array(
+        'description' => 'Nickname',
+        'type' => 'varchar',
+        'length' => '255',
+        'default' => '',
+      ),
+      'party' => array(
+        'description' => 'Political Party',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'state' => array(
+        'description' => 'State',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'district' => array(
+        'description' => 'Congressional District',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'in_office' => array(
+        'description' => 'Is the lawmaker in office',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'gender' => array(
+        'description' => 'Gender',
+        'type' => 'varchar',
+        'length' => '25',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'phone' => array(
+        'description' => 'Phone number',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'fax' => array(
+        'description' => 'Fax number',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'website' => array(
+        'description' => 'Website of lawmaker',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'webform' => array(
+        'description' => 'Link to webform',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'congress_office' => array(
+        'description' => 'Congress Office',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'bioguide_id' => array(
+        'description' => 'Bioguide ID',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'votesmart_id' => array(
+        'description' => 'Votesmart ID',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'fec_id' => array(
+        'description' => 'FEC ID',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'govtrack_id' => array(
+        'description' => 'GovTrack ID',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'crp_id' => array(
+        'description' => 'CRP ID',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'eventful_id' => array(
+        'description' => 'Eventful ID',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'sunlight_old_id' => array(
+        'description' => 'Sunlight Old ID',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'twitter_id' => array(
+        'description' => 'Twitter Account ID',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'congresspedia_url' => array(
+        'description' => 'Congresspedia URL',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'youtube_url' => array(
+        'description' => 'Youtube Channel',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'official_rss' => array(
+        'description' => 'Official RSS feed',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+      ),
+      'senate_class' => array(
+        'description' => 'Senate Class',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => FALSE,
+      ),
+      'created' => array(
+        'description' => 'Created timestamp',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'changed' => array(
+        'description' => 'Changed timestamp',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('lawmakers_id'),
+    'indexes' => array(
+      'search_idx' => array('firstname', 'lastname'),
+      'state_idx' => array('state'),
+      'username_idx' => array('username'),
+    ),
+  );
+  return $schema;
+}

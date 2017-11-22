@@ -1,0 +1,18 @@
+<?php
+
+/**
+
+ * Implements hook_preprocess_search_api_page_result().
+
+ * Gets various values ready for the $variables for search result template.
+
+ */
+
+function zork_preprocess_search_api_page_result(&$vars) {
+  // Change link to the page, on search result page.
+  // Because url points to the views_snapshot node and need to be proper page.
+//  dsm($vars);
+  if ($vars['item']->type === 'search_not_a_node') {
+  $vars['url']['path'] = $vars['item']->field_link_to_page['und'][0]['safe_value'];
+  }
+}
