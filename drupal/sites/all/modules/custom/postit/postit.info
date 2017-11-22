@@ -1,0 +1,8 @@
+name = Postit sample custom entity
+description = Create custom entities from https://www.bluespark.com/blog/drupal-entities-part-3-programming-hello-drupal-entity
+core = 7.x
+version = "7.x-1.0"
+project = "Postit"
+dependencies[] = entity
+;dependencies[] = search_api
+files[] = includes/postit.controller.inc

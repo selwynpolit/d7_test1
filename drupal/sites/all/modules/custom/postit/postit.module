@@ -1,0 +1,174 @@
+<?php
+
+
+
+/**
+ * Implementation of hook_entity_info.
+ *
+ * @return mixed
+ */
+function postit_entity_info(){
+  $postit_info['postit'] = array(
+    'label' => t('PostIt Note'),
+    'controller class' => 'PostItController',
+    'base table' => 'postit',
+    'uri callback' => 'postit_uri',
+    'fieldable' => TRUE,
+    'entity keys' => array(
+      'id' => 'pid',
+    ),
+    'static cache' => TRUE,
+    'bundles' => array(
+      'postit'=> array(
+        'label' => 'PostIt',
+        'admin' => array(
+          'path' => 'admin/structure/postit/manage',
+          'access arguments' => array('administer postits'),
+        ),
+      ),
+    ),
+    'view modes' => array(
+      'full' => array(
+        'label' => t('Full PostIt'),
+        'custom settings' =>  FALSE,
+      ),
+    )
+  );
+
+  return $postit_info;
+}
+
+function postit_uri($postit){
+  return array(
+    'path' => 'postit/' . $postit->id,
+  );
+}
+
+function postit_load($pid = NULL, $reset = FALSE){
+  $pids = (isset ($pid) ? array($pid) : array());
+  $postit = postit_load_multiple($pids, $reset);
+  return $postit ? reset ($postit) : FALSE;
+}
+
+function postit_load_multiple($pids = array(), $conditions = array(), $reset = FALSE){
+  return entity_load('postit', $pids, $conditions, $reset);
+}
+
+function postit_menu(){
+  $items['admin/structure/postit/manage'] = array(
+    'title' => 'PostIt Admin',
+    'description' => 'Manage PostIT structure',
+    'page callback' => 'postit_info',
+    'access arguments' => array('administer postits'),
+  );
+  $items['postit/%postit'] = array(
+    'title callback' => 'postit_page_title',
+    'title arguments' => array(1),
+    'page callback' => 'postit_page_view',
+    'page arguments' => array(1),
+    'access arguments' => array('view postits'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['postit/add'] = array(
+    'title' => 'Add PostIT!',
+    'page callback' => 'postit_add',
+    'access arguments' => array('create postit'),
+  );
+  return $items;
+}
+
+function postit_permission(){
+  return array(
+    'administer postits' =>  array(
+      'title' => t('Administer postits'),
+      'restrict access' => TRUE,
+    ),
+    'view postsits' => array(
+      'title' => t('View PostIts'),
+    )
+  );
+}
+
+
+function postit_info() {
+  return ('Welcome to the administration page for your Postits!');
+}
+
+function postit_page_title($postit){
+  return "pid: " . $postit->pid . " note: " . $postit->note;
+}
+
+function postit_page_view($postit, $view_mode = 'full'){
+  $postit->content = array();
+
+  // Build fields content.
+  field_attach_prepare_view('postit', array($postit->pid => $postit), $view_mode);
+  entity_prepare_view('postit', array($postit->pid => $postit));
+  $postit->content += field_attach_view('postit', $postit, $view_mode);
+
+  return $postit->content;
+}
+
+
+function postit_field_extra_fields() {
+  $return = array();
+  $return['postit']['postit'] = array(
+    'form' => array(
+      'note' => array(
+        'label' => t('Note'),
+        'description' => t('PostIt Note'),
+      ),
+    ),
+  );
+
+  return $return;
+}
+
+
+function postit_add() {
+  $postit = (object) array (
+    'pid' => '',
+    'type' => 'postit',
+    'note' => '',
+  );
+
+  return drupal_get_form('postit_add_form', $postit);
+}
+
+
+function postit_add_form($form, &$form_state, $postit) {
+  $form['note'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Note'),
+    '#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+
+  field_attach_form('postit', $postit, $form, $form_state);
+
+  return $form;
+}
+
+function postit_add_form_validate($form, &$form_state) {
+  $postit_submisttion = (object) $form_state['values'];
+  field_attach_form_validate('postit', $postit_submisttion, $form, $form_state);
+}
+
+function postit_add_form_submit($form, &$form_state) {
+  $postit_submission = (object) $form_state['values'];
+  field_attach_submit('postit', $postit_submission, $form, $form_state);
+  $postit = postit_save($postit_submission);
+  $form_state['redirect'] = "postit/$postit->pid";
+}
+
+function postit_save(&$postit) {
+  return entity_get_controller('postit')->save($postit);
+}
+
+
+
+
